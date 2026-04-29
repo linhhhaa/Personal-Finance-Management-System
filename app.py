@@ -49,10 +49,10 @@ def get_categories():
     )
 
 
-def select_user(label="Chọn người dùng", key=None):
+def select_user(label="Select user", key=None):
     users = get_users()
     if not users:
-        st.warning("Chưa có user nào. Hãy tạo user trước!")
+        st.warning("No users available. Please create a user first!")
         return None
     user_dict = {u['UserName']: u['UserID'] for u in users}
     selected = st.selectbox(label, list(user_dict.keys()), key=key)
@@ -67,12 +67,12 @@ def fmt_money(val):
 # ============================================================
 # SIDEBAR
 # ============================================================
-st.sidebar.title("💰 Personal finance management system")
+st.sidebar.title("Personal finance management system")
 
 menu = st.sidebar.radio(
-    "📋 Menu",
-    ["🏠 Dashboard", "👤 Users", "🏦 Bank Accounts",
-     "💰 Income", "💸 Expenses", "📊 Reports"]
+     "Go to",
+    ["Dashboard", "Users", "Bank Accounts",
+     "Income", "Expenses", "Reports"]
 )
 
 st.sidebar.divider()
@@ -83,7 +83,7 @@ st.sidebar.caption("DS66A - 11247184")
 # ============================================================
 # PAGE 1: DASHBOARD
 # ============================================================
-if menu == "🏠 Dashboard":
+if menu == "Dashboard":
     st.title("Financial overview")
 
     user_id = select_user()
@@ -154,7 +154,7 @@ if menu == "🏠 Dashboard":
 # ============================================================
 # PAGE 2: USERS
 # ============================================================
-elif menu == "👤 Users":
+elif menu == "Users":
     st.title("User management")
     tab1, tab2 = st.tabs(["List", "Add/Update/Delete"])
 
@@ -182,7 +182,7 @@ elif menu == "👤 Users":
                                 "VALUES(%s, %s, %s)",
                                 (name, email, phone)
                             )
-                            st.success("✅ User added!")
+                            st.success("User added!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -199,13 +199,13 @@ elif menu == "👤 Users":
                     name = st.text_input("Name", value=u['UserName'])
                     email = st.text_input("Email", value=u['Email'])
                     phone = st.text_input("Phone Number", value=u['PhoneNumber'] or '')
-                    if st.form_submit_button("💾 Update"):
+                    if st.form_submit_button("Update"):
                         db.execute(
                             "UPDATE Users SET UserName=%s, Email=%s, PhoneNumber=%s "
                             "WHERE UserID=%s",
                             (name, email, phone, u['UserID'])
                         )
-                        st.success("✅ User updated!")
+                        st.success("User updated!")
                         st.rerun()
 
         elif action == "Delete":
@@ -222,7 +222,7 @@ elif menu == "👤 Users":
                         db.execute("DELETE FROM Income WHERE UserID=%s", (uid,))
                         # BankAccounts có ON DELETE CASCADE
                         db.execute("DELETE FROM Users WHERE UserID=%s", (uid,))
-                        st.success("✅ User deleted!")
+                        st.success("User deleted!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -231,7 +231,7 @@ elif menu == "👤 Users":
 # ============================================================
 # PAGE 3: BANK ACCOUNTS
 # ============================================================
-elif menu == "🏦 Bank Accounts":
+elif menu == "Bank Accounts":
     st.title("Bank account management")
     tab1, tab2 = st.tabs(["List", "Add/Update/Delete"])
 
@@ -266,7 +266,7 @@ elif menu == "🏦 Bank Accounts":
                                 "VALUES(%s, %s, %s)",
                                 (user_dict[user], bank, bal)
                             )
-                            st.success("✅ Bank account added!")
+                            st.success("Bank account added!")
                             st.rerun()
 
             elif action == "Update":
@@ -284,7 +284,7 @@ elif menu == "🏦 Bank Accounts":
                                 "WHERE AccountID=%s",
                                 (bank, bal, a['AccountID'])
                             )
-                            st.success("✅ Bank account updated!")
+                            st.success("Bank account updated!")
                             st.rerun()
 
             elif action == "Delete":
@@ -293,13 +293,13 @@ elif menu == "🏦 Bank Accounts":
                     opts = {f"{a['AccountID']} - {a['UserName']} - {a['BankName']}": a['AccountID'] for a in accs}
                     sel = st.selectbox("Select account to delete", list(opts.keys()))
                     st.warning("⚠️ Deleting an account will delete all related transactions!")
-                    if st.button("🗑️ Confirm Delete", type="primary", key="del_acc"):
+                    if st.button("Confirm Delete", type="primary", key="del_acc"):
                         try:
                             aid = opts[sel]
                             db.execute("DELETE FROM Expenses WHERE AccountID=%s", (aid,))
                             db.execute("DELETE FROM Income WHERE AccountID=%s", (aid,))
                             db.execute("DELETE FROM BankAccounts WHERE AccountID=%s", (aid,))
-                            st.success("✅ Bank account deleted!")
+                            st.success("Bank account deleted!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -308,7 +308,7 @@ elif menu == "🏦 Bank Accounts":
 # ============================================================
 # PAGE 4: INCOME
 # ============================================================
-elif menu == "💰 Income":
+elif menu == "Income":
     st.title("Income management")
     tab1, tab2 = st.tabs(["List", "Add/Update/Delete"])
 
@@ -355,14 +355,14 @@ elif menu == "💰 Income":
                         d = st.date_input("Date", value=date.today())
                         desc = st.text_input("Description")
                        # st.caption("💡 **Trigger** `After_Income_Insert` will automatically add money to the balance.")
-                        if st.form_submit_button("➕ Add Income"):
+                        if st.form_submit_button("Add Income"):
                             if amt > 0:
                                 db.execute(
                                     "INSERT INTO Income(UserID, AccountID, Amount, IncomeDate, Description) "
                                     "VALUES(%s, %s, %s, %s, %s)",
                                     (user_dict[user], acc_dict[acc], amt, d, desc)
                                 )
-                                st.success("✅ Income added! Balance has been updated.")
+                                st.success("Income added! Balance has been updated.")
                                 st.rerun()
 
             elif action == "Update":
@@ -383,7 +383,7 @@ elif menu == "💰 Income":
                         amt = st.number_input("Amount", value=float(i['Amount']), step=10000.0)
                         d = st.date_input("Date", value=i['IncomeDate'])
                         desc = st.text_input("Description", value=i['Description'] or '')
-                        if st.form_submit_button("💾 Update"):
+                        if st.form_submit_button("Update"):
                             diff = amt - float(i['Amount'])
                             db.execute(
                                 "UPDATE Income SET Amount=%s, IncomeDate=%s, Description=%s "
@@ -394,7 +394,7 @@ elif menu == "💰 Income":
                                 "UPDATE BankAccounts SET Balance = Balance + %s WHERE AccountID=%s",
                                 (diff, i['AccountID'])
                             )
-                            st.success("✅ Income updated! Balance has been adjusted.")
+                            st.success("Income updated! Balance has been adjusted.")
                             st.rerun()
 
             elif action == "Delete":
@@ -410,21 +410,21 @@ elif menu == "💰 Income":
                         for i in data
                     }
                     sel = st.selectbox("Select to delete", list(opts.keys()))
-                    if st.button("🗑️ Confirm Delete", type="primary", key="del_inc"):
+                    if st.button("Confirm Delete", type="primary", key="del_inc"):
                         i = opts[sel]
                         db.execute(
                             "UPDATE BankAccounts SET Balance = Balance - %s WHERE AccountID=%s",
                             (float(i['Amount']), i['AccountID'])
                         )
                         db.execute("DELETE FROM Income WHERE IncomeID=%s", (i['IncomeID'],))
-                        st.success("✅ Deleted and balance has been restored!")
+                        st.success("Income deleted and balance has been restored!")
                         st.rerun()
 
 
 # ============================================================
 # PAGE 5: EXPENSES
 # ============================================================
-elif menu == "💸 Expenses":
+elif menu == "Expenses":
     st.title("Expense management")
     tab1, tab2 = st.tabs(["List", "Add/Edit/Delete"])
 
@@ -483,17 +483,17 @@ elif menu == "💸 Expenses":
                         d = st.date_input("Date", value=date.today())
                         desc = st.text_input("Description")
                       #  st.caption("💡 Gọi **Stored Procedure** `AddExpense` (kiểm tra số dư + insert + trigger).")
-                        if st.form_submit_button("➕ Add Expense"):
+                        if st.form_submit_button("Add Expense"):
                             if amt > 0:
                                 try:
                                     db.call_proc('AddExpense', (
                                         user_dict[user], acc_dict[acc], cat_dict[cat],
                                         amt, d, desc
                                     ))
-                                    st.success("✅ Added! Balance updated!")
+                                    st.success("Added! Balance updated!")
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"❌ {e}")
+                                    st.error(f"Error: {e}")
 
             elif action == "Update":
                 data = db.fetch_all("""
@@ -520,7 +520,7 @@ elif menu == "💸 Expenses":
                         amt = st.number_input("Amount", value=float(e['Amount']), step=10000.0)
                         d = st.date_input("Date", value=e['ExpenseDate'])
                         desc = st.text_input("Description", value=e['Description'] or '')
-                        if st.form_submit_button("💾 Update"):
+                        if st.form_submit_button("Update"):
                             diff = amt - float(e['Amount'])
                             db.execute(
                                 "UPDATE Expenses SET CategoryID=%s, Amount=%s, "
@@ -531,7 +531,7 @@ elif menu == "💸 Expenses":
                                 "UPDATE BankAccounts SET Balance = Balance - %s WHERE AccountID=%s",
                                 (diff, e['AccountID'])
                             )
-                            st.success("✅ Updated and balance adjusted!")
+                            st.success("Updated and balance adjusted!")
                             st.rerun()
 
             elif action == "Delete":
@@ -549,21 +549,21 @@ elif menu == "💸 Expenses":
                         for e in data
                     }
                     sel = st.selectbox("Select to delete", list(opts.keys()))
-                    if st.button("🗑️ Confirm Delete", type="primary", key="del_exp"):
+                    if st.button("Confirm Delete", type="primary", key="del_exp"):
                         e = opts[sel]
                         db.execute(
                             "UPDATE BankAccounts SET Balance = Balance + %s WHERE AccountID=%s",
                             (float(e['Amount']), e['AccountID'])
                         )
                         db.execute("DELETE FROM Expenses WHERE ExpenseID=%s", (e['ExpenseID'],))
-                        st.success("✅ Deleted and balance adjusted!")
+                        st.success("Deleted and balance adjusted!")
                         st.rerun()
 
 
 # ============================================================
 # PAGE 6: REPORTS
 # ============================================================
-elif menu == "📊 Reports":
+elif menu == "Reports":
     st.title("Financial reports and data summary")
 
     user_id = select_user("Select user to view reports")
@@ -714,14 +714,14 @@ elif menu == "📊 Reports":
 
             view_choice = st.selectbox(
                 "Select view option to display",
-                ["📌 Total transactions by category",
-                 "📌 Transaction history",
-                 "📌 Monthly financial summary"]
+                ["Total transactions by category",
+                 "Transaction history",
+                 "Monthly financial summary"]
             )
             st.markdown("---")
 
             # ---- VIEW 1 ----
-            if view_choice == "📌 Total transactions by category":
+            if view_choice == "Total transactions by category":
                 st.markdown("#### `Total transactions by category`")
                 st.caption("Total spending and number of transactions by different category.")
                 v1 = db.fetch_all("SELECT * FROM CategoryWiseSpending ORDER BY TotalSpent DESC")
@@ -733,7 +733,7 @@ elif menu == "📊 Reports":
                     st.info("No data available.")
 
             # ---- VIEW 2 ----
-            elif view_choice == "📌 Transaction history":
+            elif view_choice == "Transaction history":
                 st.markdown("#### `Transaction history`")
             # st.caption("Toàn bộ lịch sử giao dịch (income + expense) gộp lại, sắp xếp theo ngày.")
 
@@ -757,7 +757,7 @@ elif menu == "📊 Reports":
                     st.info("No transactions found.")
 
             # ---- VIEW 3 ----
-            elif view_choice == "📌 Monthly financial summary":
+            elif view_choice == "Monthly financial summary":
                 st.markdown("#### `Monthly financial summary`")
                 #st.caption("Tổng hợp thu - chi - tiết kiệm theo từng tháng của user đã chọn. "
                 #VIEW bắt buộc theo đề bài (monthly income/expense summaries).")
