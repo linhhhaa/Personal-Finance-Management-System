@@ -464,7 +464,7 @@ elif menu == "💸 Expenses":
             user_dict = {u['UserName']: u['UserID'] for u in users}
 
             if action == "Add New":
-                user = st.selectbox("Người chi", list(user_dict.keys()), key="exp_u")
+                user = st.selectbox("Name", list(user_dict.keys()), key="exp_u")
                 accs = get_accounts(user_dict[user])
                 if not accs:
                     st.warning("No accounts found!")
