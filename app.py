@@ -113,7 +113,7 @@ if menu == "Dashboard":
                     f"{fmt_money(savings)} VND",
                     delta=f"{rate:.1f}% vs income"
                 )
-         #   st.caption(f"💡 Dữ liệu lấy qua **Stored Procedure** `GetMonthlyReport({user_id}, {month}, {year})`")
+    #st.caption(f" Dữ liệu lấy qua **Stored Procedure** `GetMonthlyReport({user_id}, {month}, {year})`")
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -182,7 +182,7 @@ elif menu == "Users":
                                 "VALUES(%s, %s, %s)",
                                 (name, email, phone)
                             )
-                            st.success("User added!")
+                            st.toast("User added successfully!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -205,7 +205,7 @@ elif menu == "Users":
                             "WHERE UserID=%s",
                             (name, email, phone, u['UserID'])
                         )
-                        st.success("User updated!")
+                        st.toast("User updated successfully!")
                         st.rerun()
 
         elif action == "Delete":
@@ -214,7 +214,7 @@ elif menu == "Users":
                 opts = {f"{u['UserID']} - {u['UserName']}": u['UserID'] for u in users}
                 sel = st.selectbox("Select user to delete", list(opts.keys()))
                 st.warning("⚠️ Deleting a user will delete all associated accounts and transactions!")
-                if st.button("🗑️ Confirm Delete", type="primary"):
+                if st.button("Confirm Delete", type="primary"):
                     try:
                         uid = opts[sel]
                         # Xóa theo thứ tự để tránh FK constraint
@@ -222,7 +222,7 @@ elif menu == "Users":
                         db.execute("DELETE FROM Income WHERE UserID=%s", (uid,))
                         # BankAccounts có ON DELETE CASCADE
                         db.execute("DELETE FROM Users WHERE UserID=%s", (uid,))
-                        st.success("User deleted!")
+                        st.toast("User deleted!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -259,14 +259,14 @@ elif menu == "Bank Accounts":
                     user = st.selectbox("Account Holder", list(user_dict.keys()))
                     bank = st.text_input("Bank Name/Wallet *")
                     bal = st.number_input("Initial Balance (VND)", min_value=0.0, step=100000.0)
-                    if st.form_submit_button("➕ Add"):
+                    if st.form_submit_button("Add"):
                         if bank:
                             db.execute(
                                 "INSERT INTO BankAccounts(UserID, BankName, Balance) "
                                 "VALUES(%s, %s, %s)",
                                 (user_dict[user], bank, bal)
                             )
-                            st.success("Bank account added!")
+                            st.toast("Bank account added successfully!")
                             st.rerun()
 
             elif action == "Update":
@@ -278,13 +278,13 @@ elif menu == "Bank Accounts":
                     with st.form("upd_acc"):
                         bank = st.text_input("Bank Name", value=a['BankName'])
                         bal = st.number_input("Balance", value=float(a['Balance']))
-                        if st.form_submit_button("💾 Update"):
+                        if st.form_submit_button("Update"):
                             db.execute(
                                 "UPDATE BankAccounts SET BankName=%s, Balance=%s "
                                 "WHERE AccountID=%s",
                                 (bank, bal, a['AccountID'])
                             )
-                            st.success("Bank account updated!")
+                            st.toast("Bank account updated!")
                             st.rerun()
 
             elif action == "Delete":
@@ -299,7 +299,7 @@ elif menu == "Bank Accounts":
                             db.execute("DELETE FROM Expenses WHERE AccountID=%s", (aid,))
                             db.execute("DELETE FROM Income WHERE AccountID=%s", (aid,))
                             db.execute("DELETE FROM BankAccounts WHERE AccountID=%s", (aid,))
-                            st.success("Bank account deleted!")
+                            st.toast("Bank account deleted!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -354,7 +354,7 @@ elif menu == "Income":
                         amt = st.number_input("Amount (VND) *", min_value=0.0, step=10000.0)
                         d = st.date_input("Date", value=date.today())
                         desc = st.text_input("Description")
-                       # st.caption("💡 **Trigger** `After_Income_Insert` will automatically add money to the balance.")
+                       # st.caption(" **Trigger** `After_Income_Insert` will automatically add money to the balance.")
                         if st.form_submit_button("Add Income"):
                             if amt > 0:
                                 db.execute(
@@ -362,7 +362,7 @@ elif menu == "Income":
                                     "VALUES(%s, %s, %s, %s, %s)",
                                     (user_dict[user], acc_dict[acc], amt, d, desc)
                                 )
-                                st.success("Income added! Balance has been updated.")
+                                st.toast("Income added! Balance has been updated.")
                                 st.rerun()
 
             elif action == "Update":
@@ -394,7 +394,7 @@ elif menu == "Income":
                                 "UPDATE BankAccounts SET Balance = Balance + %s WHERE AccountID=%s",
                                 (diff, i['AccountID'])
                             )
-                            st.success("Income updated! Balance has been adjusted.")
+                            st.toast("Income updated! Balance has been adjusted.")
                             st.rerun()
 
             elif action == "Delete":
@@ -417,7 +417,7 @@ elif menu == "Income":
                             (float(i['Amount']), i['AccountID'])
                         )
                         db.execute("DELETE FROM Income WHERE IncomeID=%s", (i['IncomeID'],))
-                        st.success("Income deleted and balance has been restored!")
+                        st.toast("Income deleted and balance has been restored!")
                         st.rerun()
 
 
@@ -482,7 +482,7 @@ elif menu == "Expenses":
                         amt = st.number_input("Amount (VND) *", min_value=0.0, step=10000.0)
                         d = st.date_input("Date", value=date.today())
                         desc = st.text_input("Description")
-                      #  st.caption("💡 Gọi **Stored Procedure** `AddExpense` (kiểm tra số dư + insert + trigger).")
+                      #  st.caption("Gọi **Stored Procedure** `AddExpense` (kiểm tra số dư + insert + trigger).")
                         if st.form_submit_button("Add Expense"):
                             if amt > 0:
                                 try:
@@ -490,7 +490,7 @@ elif menu == "Expenses":
                                         user_dict[user], acc_dict[acc], cat_dict[cat],
                                         amt, d, desc
                                     ))
-                                    st.success("Added! Balance updated!")
+                                    st.toast("Expense added! Balance updated.")
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error: {e}")
@@ -531,7 +531,7 @@ elif menu == "Expenses":
                                 "UPDATE BankAccounts SET Balance = Balance - %s WHERE AccountID=%s",
                                 (diff, e['AccountID'])
                             )
-                            st.success("Updated and balance adjusted!")
+                            st.toast("Expense updated and balance adjusted!")
                             st.rerun()
 
             elif action == "Delete":
@@ -556,7 +556,7 @@ elif menu == "Expenses":
                             (float(e['Amount']), e['AccountID'])
                         )
                         db.execute("DELETE FROM Expenses WHERE ExpenseID=%s", (e['ExpenseID'],))
-                        st.success("Deleted and balance adjusted!")
+                        st.toast("Expense deleted and balance adjusted!")
                         st.rerun()
 
 
@@ -613,12 +613,15 @@ elif menu == "Reports":
         # ----- 2. Bar chart: Thu vs Chi theo tháng -----
         elif report_type == "Income vs Expense by month":
             st.subheader("Comparison of income and expenses by month")
-           # st.caption("📌 Data fetched from **VIEW** `MonthlyFinancialSummary`")
+            today = date.today()
+            col_yr1, col_yr2 = st.columns(2)
+            year_from = col_yr1.number_input("From year", value=today.year - 1, step=1, key="bar_yr_from")
+            year_to = col_yr2.number_input("To year", value=today.year, step=1, key="bar_yr_to")
             data = db.fetch_all("""
                 SELECT * FROM MonthlyFinancialSummary
-                WHERE UserID=%s
+                WHERE UserID=%s AND Year BETWEEN %s AND %s
                 ORDER BY Year, Month
-            """, (user_id,))
+            """, (user_id, int(year_from), int(year_to)))
             if data:
                 df = pd.DataFrame(data)
                 df['Period'] = df['Year'].astype(str) + '-' + df['Month'].astype(str).str.zfill(2)
@@ -655,13 +658,20 @@ elif menu == "Reports":
         # ----- 3. Line chart: Xu hướng chi tiêu -----
         elif report_type == "Spending trend by day":
             st.subheader("Daily spending trend")
+            today = date.today()
+            col_m, col_y = st.columns(2)
+            sel_month = col_m.selectbox("Month", list(range(1, 13)),
+                                        index=today.month - 1, key="trend_month")
+            sel_year = col_y.number_input("Year", value=today.year, step=1, key="trend_year")
             data = db.fetch_all("""
                 SELECT ExpenseDate AS d, SUM(Amount) AS total
                 FROM Expenses
                 WHERE UserID=%s
+                  AND MONTH(ExpenseDate)=%s
+                  AND YEAR(ExpenseDate)=%s
                 GROUP BY ExpenseDate
                 ORDER BY ExpenseDate
-            """, (user_id,))
+            """, (user_id, int(sel_month), int(sel_year)))
             if data:
                 df = pd.DataFrame(data)
                 df['total'] = df['total'].astype(float)
@@ -684,7 +694,7 @@ elif menu == "Reports":
                 st.info("No data available.")
 
         # ----- 4. Demo UDF -----
-        elif report_type == "Demo UDF":
+        elif report_type == "Aggregation":
             st.subheader("Quick lookup of income/expense for any month")
 
             today = date.today()
@@ -724,10 +734,18 @@ elif menu == "Reports":
             if view_choice == "Total transactions by category":
                 st.markdown("#### `Total transactions by category`")
                 st.caption("Total spending and number of transactions by different category.")
-                v1 = db.fetch_all("SELECT * FROM CategoryWiseSpending ORDER BY TotalSpent DESC")
+                v1 = db.fetch_all("""
+                    SELECT c.CategoryName, SUM(e.Amount) AS TotalSpent,
+                           COUNT(*) AS NumTransactions
+                    FROM Expenses e
+                    JOIN ExpenseCategories c ON e.CategoryID = c.CategoryID
+                    WHERE e.UserID = %s
+                    GROUP BY c.CategoryName
+                    ORDER BY TotalSpent DESC
+                """, (user_id,))
                 if v1:
                     df = pd.DataFrame(v1)
-                    df['TotalSpent'] = df['TotalSpent'].apply(fmt_money)
+                    df['Total Spent'] = df['Total Spent'].apply(fmt_money)
                     st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
                     st.info("No data available.")
@@ -743,10 +761,21 @@ elif menu == "Reports":
                     horizontal=True
                 )
 
+                base_query = """
+                    SELECT 'Income' AS Type, i.IncomeDate AS TransactionDate,
+                           b.BankName AS Account, i.Amount, i.Description
+                    FROM Income i JOIN BankAccounts b ON i.AccountID = b.AccountID
+                    WHERE i.UserID = %s
+                    UNION ALL
+                    SELECT 'Expense', e.ExpenseDate, b.BankName, -e.Amount, e.Description
+                    FROM Expenses e JOIN BankAccounts b ON e.AccountID = b.AccountID
+                    WHERE e.UserID = %s
+                    ORDER BY TransactionDate DESC
+                """
                 if view_mode == "10 latest transactions":
-                    v2 = db.fetch_all("SELECT * FROM TransactionHistory LIMIT 10")
+                    v2 = db.fetch_all(base_query + " LIMIT 10", (user_id, user_id))
                 else:
-                    v2 = db.fetch_all("SELECT * FROM TransactionHistory")
+                    v2 = db.fetch_all(base_query, (user_id, user_id))
 
                 if v2:
                     df = pd.DataFrame(v2)
@@ -768,7 +797,7 @@ elif menu == "Reports":
                 )
                 if v3:
                     df = pd.DataFrame(v3)
-                    for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
+                    for col in ['Total Income', 'Total Expense', 'Net Savings']:
                         df[col] = df[col].apply(fmt_money)
                     st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
