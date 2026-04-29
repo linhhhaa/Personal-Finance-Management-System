@@ -1,10 +1,11 @@
 """
 app.py - Personal Finance Manager (Streamlit)
-NEU - DATCOM Lab - Project 13
 """
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.ticker import FuncFormatter
 from datetime import date
 import db
 
@@ -66,8 +67,7 @@ def fmt_money(val):
 # ============================================================
 # SIDEBAR
 # ============================================================
-st.sidebar.title("💰 Personal Finance")
-st.sidebar.caption("Hệ thống quản lý tài chính cá nhân")
+st.sidebar.title("💰 Personal finance management system")
 
 menu = st.sidebar.radio(
     "📋 Menu",
@@ -76,22 +76,22 @@ menu = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("**NEU - DATCOM Lab**")
-st.sidebar.caption("Project 13: Personal Finance")
+st.sidebar.caption("**NEU - Dương Hà Linh**")
+st.sidebar.caption("DS66A - 11247184")
 
 
 # ============================================================
 # PAGE 1: DASHBOARD
 # ============================================================
 if menu == "🏠 Dashboard":
-    st.title("🏠 Tổng quan tài chính")
+    st.title("Financial overview")
 
     user_id = select_user()
     if user_id:
         today = date.today()
         col_m, col_y = st.columns(2)
-        month = col_m.selectbox("Tháng", list(range(1, 13)), index=today.month - 1)
-        year = col_y.number_input("Năm", value=today.year, step=1)
+        month = col_m.selectbox("Month", list(range(1, 13)), index=today.month - 1)
+        year = col_y.number_input("Year", value=today.year, step=1)
 
         st.markdown("---")
 
@@ -105,32 +105,32 @@ if menu == "🏠 Dashboard":
                 savings = float(r['NetSavings'] or 0)
 
                 col1, col2, col3 = st.columns(3)
-                col1.metric("💰 Tổng thu", f"{fmt_money(income)} VND")
-                col2.metric("💸 Tổng chi", f"{fmt_money(expense)} VND")
+                col1.metric("Total income", f"{fmt_money(income)} VND")
+                col2.metric("Total expense", f"{fmt_money(expense)} VND")
                 rate = (savings / income * 100) if income > 0 else 0
                 col3.metric(
-                    "💎 Tiết kiệm ròng",
+                    "Net savings",
                     f"{fmt_money(savings)} VND",
-                    delta=f"{rate:.1f}% so với thu nhập"
+                    delta=f"{rate:.1f}% vs income"
                 )
-                st.caption(f"💡 Dữ liệu lấy qua **Stored Procedure** `GetMonthlyReport({user_id}, {month}, {year})`")
+         #   st.caption(f"💡 Dữ liệu lấy qua **Stored Procedure** `GetMonthlyReport({user_id}, {month}, {year})`")
         except Exception as e:
-            st.error(f"Lỗi: {e}")
+            st.error(f"Error: {e}")
 
         # Số dư tài khoản
-        st.subheader("🏦 Số dư các tài khoản")
+        st.subheader("Account balances")
         accounts = get_accounts(user_id)
         if accounts:
             total = sum(float(a['Balance']) for a in accounts)
             df = pd.DataFrame(accounts)
             df['Balance'] = df['Balance'].apply(lambda x: f"{fmt_money(x)} VND")
             st.dataframe(df, use_container_width=True, hide_index=True)
-            st.info(f"💎 **Tổng số dư**: {fmt_money(total)} VND")
+            st.info(f"**Total balance**: {fmt_money(total)} VND")
         else:
-            st.warning("User này chưa có tài khoản ngân hàng nào.")
+            st.warning("This user does not have any bank accounts.")
 
-        # Giao dịch gần đây
-        st.subheader("📜 10 giao dịch gần nhất")
+        # Recent transactions
+        st.subheader("10 most recent transactions")
         history = db.fetch_all("""
             SELECT 'Income' AS Type, i.IncomeDate AS Date,
                    b.BankName AS Account, i.Amount, i.Description
@@ -148,33 +148,33 @@ if menu == "🏠 Dashboard":
             df['Amount'] = df['Amount'].apply(lambda x: f"{float(x):+,.0f}")
             st.dataframe(df, use_container_width=True, hide_index=True)
         else:
-            st.info("Chưa có giao dịch nào.")
+            st.info("No transactions found.")
 
 
 # ============================================================
 # PAGE 2: USERS
 # ============================================================
 elif menu == "👤 Users":
-    st.title("👤 Quản lý người dùng")
-    tab1, tab2 = st.tabs(["📋 Danh sách", "➕ Thêm/Sửa/Xóa"])
+    st.title("User management")
+    tab1, tab2 = st.tabs(["List", "Add/Update/Delete"])
 
     with tab1:
         users = get_users()
         if users:
             st.dataframe(pd.DataFrame(users), use_container_width=True, hide_index=True)
         else:
-            st.info("Chưa có người dùng nào.")
+            st.info("No users found.")
 
     with tab2:
-        action = st.radio("Hành động", ["Thêm mới", "Cập nhật", "Xóa"],
+        action = st.radio("Action", ["Add new", "Update", "Delete"],
                           horizontal=True, key="user_act")
 
-        if action == "Thêm mới":
+        if action == "Add new":
             with st.form("add_user", clear_on_submit=True):
-                name = st.text_input("Tên người dùng *")
+                name = st.text_input("Name *")
                 email = st.text_input("Email *")
-                phone = st.text_input("Số điện thoại")
-                if st.form_submit_button("➕ Thêm"):
+                phone = st.text_input("Phone Number")
+                if st.form_submit_button("➕ Add"):
                     if name and email:
                         try:
                             db.execute(
@@ -182,39 +182,39 @@ elif menu == "👤 Users":
                                 "VALUES(%s, %s, %s)",
                                 (name, email, phone)
                             )
-                            st.success("✅ Đã thêm user!")
+                            st.success("✅ User added!")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Lỗi: {e}")
+                            st.error(f"Error: {e}")
                     else:
-                        st.warning("Vui lòng nhập tên và email.")
+                        st.warning("Please enter name and email.")
 
-        elif action == "Cập nhật":
+        elif action == "Update":
             users = get_users()
             if users:
                 opts = {f"{u['UserID']} - {u['UserName']}": u for u in users}
-                sel = st.selectbox("Chọn user", list(opts.keys()))
+                sel = st.selectbox("Select user", list(opts.keys()))
                 u = opts[sel]
                 with st.form("upd_user"):
-                    name = st.text_input("Tên", value=u['UserName'])
+                    name = st.text_input("Name", value=u['UserName'])
                     email = st.text_input("Email", value=u['Email'])
-                    phone = st.text_input("SĐT", value=u['PhoneNumber'] or '')
-                    if st.form_submit_button("💾 Cập nhật"):
+                    phone = st.text_input("Phone Number", value=u['PhoneNumber'] or '')
+                    if st.form_submit_button("💾 Update"):
                         db.execute(
                             "UPDATE Users SET UserName=%s, Email=%s, PhoneNumber=%s "
                             "WHERE UserID=%s",
                             (name, email, phone, u['UserID'])
                         )
-                        st.success("✅ Đã cập nhật!")
+                        st.success("✅ User updated!")
                         st.rerun()
 
-        elif action == "Xóa":
+        elif action == "Delete":
             users = get_users()
             if users:
                 opts = {f"{u['UserID']} - {u['UserName']}": u['UserID'] for u in users}
-                sel = st.selectbox("Chọn user cần xóa", list(opts.keys()))
-                st.warning("⚠️ Xóa user sẽ xóa toàn bộ tài khoản, thu/chi liên quan!")
-                if st.button("🗑️ Xác nhận xóa", type="primary"):
+                sel = st.selectbox("Select user to delete", list(opts.keys()))
+                st.warning("⚠️ Deleting a user will delete all associated accounts and transactions!")
+                if st.button("🗑️ Confirm Delete", type="primary"):
                     try:
                         uid = opts[sel]
                         # Xóa theo thứ tự để tránh FK constraint
@@ -222,18 +222,18 @@ elif menu == "👤 Users":
                         db.execute("DELETE FROM Income WHERE UserID=%s", (uid,))
                         # BankAccounts có ON DELETE CASCADE
                         db.execute("DELETE FROM Users WHERE UserID=%s", (uid,))
-                        st.success("✅ Đã xóa!")
+                        st.success("✅ User deleted!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Lỗi: {e}")
+                        st.error(f"Error: {e}")
 
 
 # ============================================================
 # PAGE 3: BANK ACCOUNTS
 # ============================================================
 elif menu == "🏦 Bank Accounts":
-    st.title("🏦 Quản lý tài khoản ngân hàng")
-    tab1, tab2 = st.tabs(["📋 Danh sách", "➕ Thêm/Sửa/Xóa"])
+    st.title("Bank account management")
+    tab1, tab2 = st.tabs(["List", "Add/Update/Delete"])
 
     with tab1:
         accs = get_accounts()
@@ -242,79 +242,78 @@ elif menu == "🏦 Bank Accounts":
             df = pd.DataFrame(accs)
             df['Balance'] = df['Balance'].apply(lambda x: f"{fmt_money(x)} VND")
             st.dataframe(df, use_container_width=True, hide_index=True)
-            st.info(f"💰 Tổng số dư hệ thống: **{fmt_money(total)} VND**")
         else:
-            st.info("Chưa có tài khoản nào.")
+            st.info("No bank accounts found.")
 
     with tab2:
-        action = st.radio("Hành động", ["Thêm mới", "Cập nhật", "Xóa"],
+        action = st.radio("Action", ["Add New", "Update", "Delete"],
                           horizontal=True, key="acc_act")
         users = get_users()
         if not users:
-            st.warning("Cần tạo user trước!")
+            st.warning("Please create a user first!")
         else:
             user_dict = {u['UserName']: u['UserID'] for u in users}
 
-            if action == "Thêm mới":
+            if action == "Add New":
                 with st.form("add_acc", clear_on_submit=True):
-                    user = st.selectbox("Chủ tài khoản", list(user_dict.keys()))
-                    bank = st.text_input("Tên ngân hàng/ví *")
-                    bal = st.number_input("Số dư khởi tạo (VND)", min_value=0.0, step=100000.0)
-                    if st.form_submit_button("➕ Thêm"):
+                    user = st.selectbox("Account Holder", list(user_dict.keys()))
+                    bank = st.text_input("Bank Name/Wallet *")
+                    bal = st.number_input("Initial Balance (VND)", min_value=0.0, step=100000.0)
+                    if st.form_submit_button("➕ Add"):
                         if bank:
                             db.execute(
                                 "INSERT INTO BankAccounts(UserID, BankName, Balance) "
                                 "VALUES(%s, %s, %s)",
                                 (user_dict[user], bank, bal)
                             )
-                            st.success("✅ Đã thêm!")
+                            st.success("✅ Bank account added!")
                             st.rerun()
 
-            elif action == "Cập nhật":
+            elif action == "Update":
                 accs = get_accounts()
                 if accs:
                     opts = {f"{a['AccountID']} - {a['UserName']} - {a['BankName']}": a for a in accs}
-                    sel = st.selectbox("Chọn tài khoản", list(opts.keys()))
+                    sel = st.selectbox("Select account", list(opts.keys()))
                     a = opts[sel]
                     with st.form("upd_acc"):
-                        bank = st.text_input("Tên ngân hàng", value=a['BankName'])
-                        bal = st.number_input("Số dư", value=float(a['Balance']))
-                        if st.form_submit_button("💾 Cập nhật"):
+                        bank = st.text_input("Bank Name", value=a['BankName'])
+                        bal = st.number_input("Balance", value=float(a['Balance']))
+                        if st.form_submit_button("💾 Update"):
                             db.execute(
                                 "UPDATE BankAccounts SET BankName=%s, Balance=%s "
                                 "WHERE AccountID=%s",
                                 (bank, bal, a['AccountID'])
                             )
-                            st.success("✅ Đã cập nhật!")
+                            st.success("✅ Bank account updated!")
                             st.rerun()
 
-            elif action == "Xóa":
+            elif action == "Delete":
                 accs = get_accounts()
                 if accs:
                     opts = {f"{a['AccountID']} - {a['UserName']} - {a['BankName']}": a['AccountID'] for a in accs}
-                    sel = st.selectbox("Chọn tài khoản cần xóa", list(opts.keys()))
-                    st.warning("⚠️ Xóa tài khoản sẽ xóa các giao dịch liên quan!")
-                    if st.button("🗑️ Xác nhận xóa", type="primary", key="del_acc"):
+                    sel = st.selectbox("Select account to delete", list(opts.keys()))
+                    st.warning("⚠️ Deleting an account will delete all related transactions!")
+                    if st.button("🗑️ Confirm Delete", type="primary", key="del_acc"):
                         try:
                             aid = opts[sel]
                             db.execute("DELETE FROM Expenses WHERE AccountID=%s", (aid,))
                             db.execute("DELETE FROM Income WHERE AccountID=%s", (aid,))
                             db.execute("DELETE FROM BankAccounts WHERE AccountID=%s", (aid,))
-                            st.success("✅ Đã xóa!")
+                            st.success("✅ Bank account deleted!")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Lỗi: {e}")
+                            st.error(f"Error: {e}")
 
 
 # ============================================================
 # PAGE 4: INCOME
 # ============================================================
 elif menu == "💰 Income":
-    st.title("💰 Quản lý thu nhập")
-    tab1, tab2 = st.tabs(["📋 Danh sách", "➕ Thêm/Sửa/Xóa"])
+    st.title("Income management")
+    tab1, tab2 = st.tabs(["List", "Add/Update/Delete"])
 
     with tab1:
-        user_id = select_user("Lọc theo người dùng", key="inc_filter")
+        user_id = select_user("Filter by user", key="inc_filter")
         if user_id:
             data = db.fetch_all("""
                 SELECT i.IncomeID, u.UserName, b.BankName, i.Amount,
@@ -326,45 +325,47 @@ elif menu == "💰 Income":
                 ORDER BY i.IncomeDate DESC
             """, (user_id,))
             if data:
+                total = sum(float(i['Amount']) for i in data)
                 df = pd.DataFrame(data)
                 df['Amount'] = df['Amount'].apply(fmt_money)
                 st.dataframe(df, use_container_width=True, hide_index=True)
+                st.info(f"Total income: **{fmt_money(total)} VND**")
             else:
-                st.info("Chưa có khoản thu nhập nào.")
+                st.info("No income records found.")
 
     with tab2:
-        action = st.radio("Hành động", ["Thêm mới", "Cập nhật", "Xóa"],
+        action = st.radio("Action", ["Add", "Update", "Delete"],
                           horizontal=True, key="inc_act")
         users = get_users()
         if not users:
-            st.warning("Cần tạo user trước!")
+            st.warning("Please create a user first!")
         else:
             user_dict = {u['UserName']: u['UserID'] for u in users}
 
-            if action == "Thêm mới":
-                user = st.selectbox("Người nhận", list(user_dict.keys()), key="inc_u")
+            if action == "Add":
+                user = st.selectbox("User", list(user_dict.keys()), key="inc_u")
                 accs = get_accounts(user_dict[user])
                 if not accs:
-                    st.warning("User này chưa có tài khoản nào!")
+                    st.warning("This user has no bank accounts!")
                 else:
                     acc_dict = {a['BankName']: a['AccountID'] for a in accs}
                     with st.form("add_inc", clear_on_submit=True):
-                        acc = st.selectbox("Tài khoản nhận tiền", list(acc_dict.keys()))
-                        amt = st.number_input("Số tiền (VND) *", min_value=0.0, step=10000.0)
-                        d = st.date_input("Ngày", value=date.today())
-                        desc = st.text_input("Mô tả")
-                        st.caption("💡 **Trigger** `After_Income_Insert` sẽ tự động cộng tiền vào số dư.")
-                        if st.form_submit_button("➕ Thêm thu nhập"):
+                        acc = st.selectbox("Account to receive money", list(acc_dict.keys()))
+                        amt = st.number_input("Amount (VND) *", min_value=0.0, step=10000.0)
+                        d = st.date_input("Date", value=date.today())
+                        desc = st.text_input("Description")
+                       # st.caption("💡 **Trigger** `After_Income_Insert` will automatically add money to the balance.")
+                        if st.form_submit_button("➕ Add Income"):
                             if amt > 0:
                                 db.execute(
                                     "INSERT INTO Income(UserID, AccountID, Amount, IncomeDate, Description) "
                                     "VALUES(%s, %s, %s, %s, %s)",
                                     (user_dict[user], acc_dict[acc], amt, d, desc)
                                 )
-                                st.success("✅ Đã thêm! Số dư đã được cập nhật qua trigger.")
+                                st.success("✅ Income added! Balance has been updated.")
                                 st.rerun()
 
-            elif action == "Cập nhật":
+            elif action == "Update":
                 data = db.fetch_all("""
                     SELECT i.*, u.UserName, b.BankName
                     FROM Income i JOIN Users u ON i.UserID=u.UserID
@@ -376,13 +377,13 @@ elif menu == "💰 Income":
                         f"{i['IncomeID']} - {i['UserName']} - {fmt_money(i['Amount'])} VND - {i['IncomeDate']}": i
                         for i in data
                     }
-                    sel = st.selectbox("Chọn", list(opts.keys()))
+                    sel = st.selectbox("Select", list(opts.keys()))
                     i = opts[sel]
                     with st.form("upd_inc"):
-                        amt = st.number_input("Số tiền", value=float(i['Amount']), step=10000.0)
-                        d = st.date_input("Ngày", value=i['IncomeDate'])
-                        desc = st.text_input("Mô tả", value=i['Description'] or '')
-                        if st.form_submit_button("💾 Cập nhật"):
+                        amt = st.number_input("Amount", value=float(i['Amount']), step=10000.0)
+                        d = st.date_input("Date", value=i['IncomeDate'])
+                        desc = st.text_input("Description", value=i['Description'] or '')
+                        if st.form_submit_button("💾 Update"):
                             diff = amt - float(i['Amount'])
                             db.execute(
                                 "UPDATE Income SET Amount=%s, IncomeDate=%s, Description=%s "
@@ -393,10 +394,10 @@ elif menu == "💰 Income":
                                 "UPDATE BankAccounts SET Balance = Balance + %s WHERE AccountID=%s",
                                 (diff, i['AccountID'])
                             )
-                            st.success("✅ Đã cập nhật và điều chỉnh số dư!")
+                            st.success("✅ Income updated! Balance has been adjusted.")
                             st.rerun()
 
-            elif action == "Xóa":
+            elif action == "Delete":
                 data = db.fetch_all("""
                     SELECT i.*, u.UserName, b.BankName
                     FROM Income i JOIN Users u ON i.UserID=u.UserID
@@ -408,15 +409,15 @@ elif menu == "💰 Income":
                         f"{i['IncomeID']} - {i['UserName']} - {fmt_money(i['Amount'])} VND - {i['IncomeDate']}": i
                         for i in data
                     }
-                    sel = st.selectbox("Chọn cần xóa", list(opts.keys()))
-                    if st.button("🗑️ Xác nhận xóa", type="primary", key="del_inc"):
+                    sel = st.selectbox("Select to delete", list(opts.keys()))
+                    if st.button("🗑️ Confirm Delete", type="primary", key="del_inc"):
                         i = opts[sel]
                         db.execute(
                             "UPDATE BankAccounts SET Balance = Balance - %s WHERE AccountID=%s",
                             (float(i['Amount']), i['AccountID'])
                         )
                         db.execute("DELETE FROM Income WHERE IncomeID=%s", (i['IncomeID'],))
-                        st.success("✅ Đã xóa và hoàn lại số dư!")
+                        st.success("✅ Deleted and balance has been restored!")
                         st.rerun()
 
 
@@ -424,11 +425,11 @@ elif menu == "💰 Income":
 # PAGE 5: EXPENSES
 # ============================================================
 elif menu == "💸 Expenses":
-    st.title("💸 Quản lý chi tiêu")
-    tab1, tab2 = st.tabs(["📋 Danh sách", "➕ Thêm/Sửa/Xóa"])
+    st.title("Expense management")
+    tab1, tab2 = st.tabs(["List", "Add/Edit/Delete"])
 
     with tab1:
-        user_id = select_user("Lọc theo người dùng", key="exp_filter")
+        user_id = select_user("Filter by user", key="exp_filter")
         if user_id:
             data = db.fetch_all("""
                 SELECT e.ExpenseID, u.UserName, b.BankName, c.CategoryName,
@@ -445,55 +446,56 @@ elif menu == "💸 Expenses":
                 df = pd.DataFrame(data)
                 df['Amount'] = df['Amount'].apply(fmt_money)
                 st.dataframe(df, use_container_width=True, hide_index=True)
-                st.info(f"💸 Tổng chi tiêu: **{fmt_money(total)} VND**")
+                st.info(f"Total Expenses: **{fmt_money(total)} VND**")
             else:
-                st.info("Chưa có chi tiêu nào.")
+                st.info("No expenses found.")
 
     with tab2:
         action = st.radio(
-            "Hành động",
-            ["Thêm mới (qua Stored Procedure)", "Cập nhật", "Xóa"],
+            "Action",
+            ["Add New", "Update", "Delete"],
+            #thêm mới qua stored procedure để demo trigger kiểm tra số dư
             horizontal=True, key="exp_act"
         )
         users = get_users()
         if not users:
-            st.warning("Cần tạo user trước!")
+            st.warning("No users found!")
         else:
             user_dict = {u['UserName']: u['UserID'] for u in users}
 
-            if action == "Thêm mới (qua Stored Procedure)":
+            if action == "Add New":
                 user = st.selectbox("Người chi", list(user_dict.keys()), key="exp_u")
                 accs = get_accounts(user_dict[user])
                 if not accs:
-                    st.warning("User này chưa có tài khoản nào!")
+                    st.warning("No accounts found!")
                 else:
                     acc_dict = {
-                        f"{a['BankName']} (Số dư: {fmt_money(a['Balance'])} VND)": a['AccountID']
+                        f"{a['BankName']} (Balance: {fmt_money(a['Balance'])} VND)": a['AccountID']
                         for a in accs
                     }
                     cats = get_categories()
                     cat_dict = {c['CategoryName']: c['CategoryID'] for c in cats}
 
                     with st.form("add_exp", clear_on_submit=True):
-                        acc = st.selectbox("Tài khoản trừ tiền", list(acc_dict.keys()))
-                        cat = st.selectbox("Danh mục", list(cat_dict.keys()))
-                        amt = st.number_input("Số tiền (VND) *", min_value=0.0, step=10000.0)
-                        d = st.date_input("Ngày", value=date.today())
-                        desc = st.text_input("Mô tả")
-                        st.caption("💡 Gọi **Stored Procedure** `AddExpense` (kiểm tra số dư + insert + trigger).")
-                        if st.form_submit_button("➕ Thêm chi tiêu"):
+                        acc = st.selectbox("Account to deduct from", list(acc_dict.keys()))
+                        cat = st.selectbox("Category", list(cat_dict.keys()))
+                        amt = st.number_input("Amount (VND) *", min_value=0.0, step=10000.0)
+                        d = st.date_input("Date", value=date.today())
+                        desc = st.text_input("Description")
+                      #  st.caption("💡 Gọi **Stored Procedure** `AddExpense` (kiểm tra số dư + insert + trigger).")
+                        if st.form_submit_button("➕ Add Expense"):
                             if amt > 0:
                                 try:
                                     db.call_proc('AddExpense', (
                                         user_dict[user], acc_dict[acc], cat_dict[cat],
                                         amt, d, desc
                                     ))
-                                    st.success("✅ Đã thêm! Số dư cập nhật qua trigger.")
+                                    st.success("✅ Added! Balance updated!")
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"❌ {e}")
 
-            elif action == "Cập nhật":
+            elif action == "Update":
                 data = db.fetch_all("""
                     SELECT e.*, u.UserName, b.BankName, c.CategoryName
                     FROM Expenses e
@@ -507,18 +509,18 @@ elif menu == "💸 Expenses":
                         f"{e['ExpenseID']} - {e['UserName']} - {e['CategoryName']} - {fmt_money(e['Amount'])}": e
                         for e in data
                     }
-                    sel = st.selectbox("Chọn", list(opts.keys()))
+                    sel = st.selectbox("Select", list(opts.keys()))
                     e = opts[sel]
                     cats = get_categories()
                     cat_dict = {c['CategoryName']: c['CategoryID'] for c in cats}
                     cat_idx = list(cat_dict.keys()).index(e['CategoryName'])
 
                     with st.form("upd_exp"):
-                        cat = st.selectbox("Danh mục", list(cat_dict.keys()), index=cat_idx)
-                        amt = st.number_input("Số tiền", value=float(e['Amount']), step=10000.0)
-                        d = st.date_input("Ngày", value=e['ExpenseDate'])
-                        desc = st.text_input("Mô tả", value=e['Description'] or '')
-                        if st.form_submit_button("💾 Cập nhật"):
+                        cat = st.selectbox("Category", list(cat_dict.keys()), index=cat_idx)
+                        amt = st.number_input("Amount", value=float(e['Amount']), step=10000.0)
+                        d = st.date_input("Date", value=e['ExpenseDate'])
+                        desc = st.text_input("Description", value=e['Description'] or '')
+                        if st.form_submit_button("💾 Update"):
                             diff = amt - float(e['Amount'])
                             db.execute(
                                 "UPDATE Expenses SET CategoryID=%s, Amount=%s, "
@@ -529,10 +531,10 @@ elif menu == "💸 Expenses":
                                 "UPDATE BankAccounts SET Balance = Balance - %s WHERE AccountID=%s",
                                 (diff, e['AccountID'])
                             )
-                            st.success("✅ Đã cập nhật và điều chỉnh số dư!")
+                            st.success("✅ Updated and balance adjusted!")
                             st.rerun()
 
-            elif action == "Xóa":
+            elif action == "Delete":
                 data = db.fetch_all("""
                     SELECT e.*, u.UserName, b.BankName, c.CategoryName
                     FROM Expenses e
@@ -546,15 +548,15 @@ elif menu == "💸 Expenses":
                         f"{e['ExpenseID']} - {e['UserName']} - {e['CategoryName']} - {fmt_money(e['Amount'])}": e
                         for e in data
                     }
-                    sel = st.selectbox("Chọn cần xóa", list(opts.keys()))
-                    if st.button("🗑️ Xác nhận xóa", type="primary", key="del_exp"):
+                    sel = st.selectbox("Select to delete", list(opts.keys()))
+                    if st.button("🗑️ Confirm Delete", type="primary", key="del_exp"):
                         e = opts[sel]
                         db.execute(
                             "UPDATE BankAccounts SET Balance = Balance + %s WHERE AccountID=%s",
                             (float(e['Amount']), e['AccountID'])
                         )
                         db.execute("DELETE FROM Expenses WHERE ExpenseID=%s", (e['ExpenseID'],))
-                        st.success("✅ Đã xóa và hoàn lại số dư!")
+                        st.success("✅ Deleted and balance adjusted!")
                         st.rerun()
 
 
@@ -562,23 +564,23 @@ elif menu == "💸 Expenses":
 # PAGE 6: REPORTS
 # ============================================================
 elif menu == "📊 Reports":
-    st.title("📊 Báo cáo & Phân tích")
+    st.title("Financial reports and data summary")
 
-    user_id = select_user("Chọn người dùng để xem báo cáo")
+    user_id = select_user("Select user to view reports")
     if user_id:
         report_type = st.selectbox(
-            "Loại báo cáo",
-            ["🥧 Chi tiêu theo danh mục",
-             "📊 Thu vs Chi theo tháng (VIEW)",
-             "📈 Xu hướng chi tiêu theo ngày",
-             "🧮 Demo UDF (GetTotalMonthly...)",
-             "🗃️ Xem dữ liệu các VIEW"]
+            "Report type",
+            ["Spending by category",
+             "Income vs Expense by month",
+             "Spending trend by day",
+             "Demo UDF",
+             "Data summary"]
         )
         st.markdown("---")
 
         # ----- 1. Pie chart: Chi tiêu theo danh mục -----
-        if report_type == "🥧 Chi tiêu theo danh mục":
-            st.subheader("Tỷ lệ chi tiêu theo danh mục")
+        if report_type == "Spending by category":
+            st.subheader("Percentage of spending by category")
             data = db.fetch_all("""
                 SELECT c.CategoryName, SUM(e.Amount) AS TotalSpent,
                        COUNT(*) AS NumTrans
@@ -601,17 +603,17 @@ elif menu == "📊 Reports":
                     ax.set_title('Spending by Category', fontsize=14)
                     st.pyplot(fig)
                 with col2:
-                    st.markdown("### Chi tiết")
+                    st.markdown("### Detailed breakdown")
                     df_d = df.copy()
                     df_d['TotalSpent'] = df_d['TotalSpent'].apply(fmt_money)
                     st.dataframe(df_d, hide_index=True)
             else:
-                st.info("Chưa có dữ liệu chi tiêu.")
+                st.info("No spending data available.")
 
         # ----- 2. Bar chart: Thu vs Chi theo tháng -----
-        elif report_type == "📊 Thu vs Chi theo tháng (VIEW)":
-            st.subheader("So sánh thu nhập vs chi tiêu theo tháng")
-            st.caption("📌 Dữ liệu lấy từ **VIEW** `MonthlyFinancialSummary`")
+        elif report_type == "Income vs Expense by month":
+            st.subheader("Comparison of income and expenses by month")
+           # st.caption("📌 Data fetched from **VIEW** `MonthlyFinancialSummary`")
             data = db.fetch_all("""
                 SELECT * FROM MonthlyFinancialSummary
                 WHERE UserID=%s
@@ -627,15 +629,18 @@ elif menu == "📊 Reports":
                 fig, ax = plt.subplots(figsize=(10, 5))
                 x = range(len(df))
                 w = 0.35
-                ax.bar([i - w/2 for i in x], df['TotalIncome'], w,
+                # Chia /1000 để hiển thị theo đơn vị nghìn VND
+                ax.bar([i - w/2 for i in x], df['TotalIncome'] / 1000, w,
                        label='Income', color='#2ecc71')
-                ax.bar([i + w/2 for i in x], df['TotalExpense'], w,
+                ax.bar([i + w/2 for i in x], df['TotalExpense'] / 1000, w,
                        label='Expense', color='#e74c3c')
                 ax.set_xlabel('Month')
-                ax.set_ylabel('VND')
-                ax.set_title('Income vs Expense by Month')
+                ax.set_ylabel('Thousands VND')
+                ax.set_title('Income vs Expense by month')
                 ax.set_xticks(list(x))
                 ax.set_xticklabels(df['Period'])
+                # Format trục y với dấu phẩy ngăn cách hàng nghìn
+                ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
                 ax.legend()
                 ax.grid(True, alpha=0.3)
                 st.pyplot(fig)
@@ -645,11 +650,11 @@ elif menu == "📊 Reports":
                     df_d[col] = df_d[col].apply(fmt_money)
                 st.dataframe(df_d, use_container_width=True, hide_index=True)
             else:
-                st.info("Chưa có dữ liệu.")
+                st.info("No data available.")
 
         # ----- 3. Line chart: Xu hướng chi tiêu -----
-        elif report_type == "📈 Xu hướng chi tiêu theo ngày":
-            st.subheader("Chi tiêu hàng ngày")
+        elif report_type == "Spending trend by day":
+            st.subheader("Daily spending trend")
             data = db.fetch_all("""
                 SELECT ExpenseDate AS d, SUM(Amount) AS total
                 FROM Expenses
@@ -660,66 +665,112 @@ elif menu == "📊 Reports":
             if data:
                 df = pd.DataFrame(data)
                 df['total'] = df['total'].astype(float)
+                df['d'] = pd.to_datetime(df['d'])
 
                 fig, ax = plt.subplots(figsize=(10, 5))
-                ax.plot(df['d'], df['total'], marker='o', linewidth=2, color='#3498db')
-                ax.fill_between(df['d'], df['total'], alpha=0.3, color='#3498db')
-                ax.set_xlabel('Date')
-                ax.set_ylabel('VND')
+                ax.plot(df['d'], df['total'] / 1000, marker='o', linewidth=2, color='#3498db')
+                ax.fill_between(df['d'], df['total'] / 1000, alpha=0.3, color='#3498db')
+                ax.set_xlabel('Day')
+                ax.set_ylabel('Thousands VND')
                 ax.set_title('Daily Spending Trend')
                 ax.grid(True, alpha=0.3)
+                # Format ngày DD/MM/YYYY
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
+                # Format trục y với dấu phẩy
+                ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
                 fig.autofmt_xdate()
                 st.pyplot(fig)
             else:
-                st.info("Chưa có dữ liệu.")
+                st.info("No data available.")
 
         # ----- 4. Demo UDF -----
-        elif report_type == "🧮 Demo UDF (GetTotalMonthly...)":
-            st.subheader("Tính toán bằng User Defined Functions")
+        elif report_type == "Demo UDF":
+            st.subheader("Quick lookup of income/expense for any month")
+
             today = date.today()
             col1, col2 = st.columns(2)
-            month = col1.selectbox("Tháng", list(range(1, 13)),
+            month = col1.selectbox("Month", list(range(1, 13)),
                                    index=today.month - 1, key="udf_m")
-            year = col2.number_input("Năm", value=today.year, step=1, key="udf_y")
+            year = col2.number_input("Year", value=today.year, step=1, key="udf_y")
 
-            if st.button("🔍 Tính"):
+            if st.button("Calculate"):
                 inc = db.call_function('GetTotalMonthlyIncome', (user_id, month, year))
                 exp = db.call_function('GetTotalMonthlyExpense', (user_id, month, year))
 
                 col1, col2, col3 = st.columns(3)
-                col1.metric("💰 Thu nhập (UDF)", fmt_money(inc))
-                col2.metric("💸 Chi tiêu (UDF)", fmt_money(exp))
-                col3.metric("💎 Tiết kiệm", fmt_money(float(inc or 0) - float(exp or 0)))
+                col1.metric("Income", f"{fmt_money(inc)} VND")
+                col2.metric("Expense", f"{fmt_money(exp)} VND")
+                col3.metric("Savings", f"{fmt_money(float(inc or 0) - float(exp or 0))} VND")
 
-                st.code(
-                    f"-- SQL queries chạy ngầm:\n"
-                    f"SELECT GetTotalMonthlyIncome({user_id}, {month}, {year});  -- {inc}\n"
-                    f"SELECT GetTotalMonthlyExpense({user_id}, {month}, {year}); -- {exp}",
-                    language='sql'
-                )
+            #   st.markdown("**Câu SQL đã chạy ngầm:**")
+            #st.code(f"SELECT GetTotalMonthlyIncome({user_id}, {month}, {year});\n" f"-- Kết quả: {inc}\n\n" f"SELECT GetTotalMonthlyExpense({user_id}, {month}, {year});\n" f"-- Kết quả: {exp}",
+            #language='sql')
 
         # ----- 5. Xem các VIEW -----
-        elif report_type == "🗃️ Xem dữ liệu các VIEW":
-            st.subheader("Dữ liệu trong các VIEW")
+        elif report_type == "Data summary":
+            st.subheader("Summary data according to different views")
+            # st.caption("VIEW = bảng ảo, tổng hợp dữ liệu từ nhiều bảng. "
+            #"Đề bài yêu cầu tạo các view: monthly summary + category-wise spending.")
 
-            st.markdown("#### 📌 VIEW `CategoryWiseSpending`")
-            v1 = db.fetch_all("SELECT * FROM CategoryWiseSpending")
-            if v1:
-                df = pd.DataFrame(v1)
-                df['TotalSpent'] = df['TotalSpent'].apply(fmt_money)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+            view_choice = st.selectbox(
+                "Select view option to display",
+                ["📌 Total transactions by category",
+                 "📌 Transaction history",
+                 "📌 Monthly financial summary"]
+            )
+            st.markdown("---")
 
-            st.markdown("#### 📌 VIEW `TransactionHistory` (10 giao dịch gần nhất)")
-            v2 = db.fetch_all("SELECT * FROM TransactionHistory LIMIT 10")
-            if v2:
-                df = pd.DataFrame(v2)
-                df['Amount'] = df['Amount'].apply(lambda x: f"{float(x):+,.0f}")
-                st.dataframe(df, use_container_width=True, hide_index=True)
+            # ---- VIEW 1 ----
+            if view_choice == "📌 Total transactions by category":
+                st.markdown("#### `Total transactions by category`")
+                st.caption("Total spending and number of transactions by different category.")
+                v1 = db.fetch_all("SELECT * FROM CategoryWiseSpending ORDER BY TotalSpent DESC")
+                if v1:
+                    df = pd.DataFrame(v1)
+                    df['TotalSpent'] = df['TotalSpent'].apply(fmt_money)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No data available.")
 
-            st.markdown("#### 📌 VIEW `MonthlyFinancialSummary`")
-            v3 = db.fetch_all("SELECT * FROM MonthlyFinancialSummary")
-            if v3:
-                df = pd.DataFrame(v3)
-                for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
-                    df[col] = df[col].apply(fmt_money)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+            # ---- VIEW 2 ----
+            elif view_choice == "📌 Transaction history":
+                st.markdown("#### `Transaction history`")
+            # st.caption("Toàn bộ lịch sử giao dịch (income + expense) gộp lại, sắp xếp theo ngày.")
+
+                view_mode = st.radio(
+                    "Display options",
+                    ["10 latest transactions", "All transactions"],
+                    horizontal=True
+                )
+
+                if view_mode == "10 latest transactions":
+                    v2 = db.fetch_all("SELECT * FROM TransactionHistory LIMIT 10")
+                else:
+                    v2 = db.fetch_all("SELECT * FROM TransactionHistory")
+
+                if v2:
+                    df = pd.DataFrame(v2)
+                    df['Amount'] = df['Amount'].apply(lambda x: f"{float(x):+,.0f}")
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                    st.caption(f"Total number of transactions: **{len(v2)}**")
+                else:
+                    st.info("No transactions found.")
+
+            # ---- VIEW 3 ----
+            elif view_choice == "📌 Monthly financial summary":
+                st.markdown("#### `Monthly financial summary`")
+                #st.caption("Tổng hợp thu - chi - tiết kiệm theo từng tháng của user đã chọn. "
+                #VIEW bắt buộc theo đề bài (monthly income/expense summaries).")
+ 
+                v3 = db.fetch_all(
+                    "SELECT * FROM MonthlyFinancialSummary WHERE UserID=%s ORDER BY Year, Month",
+                    (user_id,)
+                )
+                if v3:
+                    df = pd.DataFrame(v3)
+                    for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
+                        df[col] = df[col].apply(fmt_money)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("This user has no financial data to summarize.")
+ 

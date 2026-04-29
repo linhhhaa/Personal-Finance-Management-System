@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ### 2. Chuẩn bị database
 - Mở MySQL Workbench
-- Chạy file `personal_finance_complete.sql` để tạo database `PersonalFinanceDB` cùng toàn bộ bảng, trigger, view, UDF, stored procedure.
+- Chạy file `PersonalFinanceDB` để tạo database `PersonalFinanceDB` cùng toàn bộ bảng, trigger, view, UDF, stored procedure.
 
 ### 3. Cấu hình kết nối
 Mở file `db.py`, sửa `password` cho khớp với MySQL của bạn:
