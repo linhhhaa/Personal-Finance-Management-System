@@ -6,7 +6,7 @@ A system that enables users to effectively manage personal income and expenses, 
 
 ---
 
-## 🚀 Hướng dẫn cài đặt
+## Hướng dẫn cài đặt
 
 ### 1. Cài thư viện Python
 ```bash
@@ -41,16 +41,16 @@ App sẽ tự động mở trên trình duyệt tại `http://localhost:8501`.
 
 | Trang | Mô tả |
 |---|---|
-| 🏠 **Dashboard** | Tổng quan tài chính tháng, số dư tài khoản, giao dịch gần đây |
-| 👤 **Users** | CRUD người dùng |
-| 🏦 **Bank Accounts** | CRUD tài khoản ngân hàng |
-| 💰 **Income** | Thêm / sửa / xóa thu nhập |
-| 💸 **Expenses** | Thêm / sửa / xóa chi tiêu (qua Stored Procedure) |
-| 📊 **Reports** | Pie / Bar / Line chart, Demo UDF, View |
+| **Dashboard** | Tổng quan tài chính tháng, số dư tài khoản, giao dịch gần đây |
+| **Users** | CRUD người dùng |
+| **Bank Accounts** | CRUD tài khoản ngân hàng |
+| **Income** | Thêm / sửa / xóa thu nhập |
+| **Expenses** | Thêm / sửa / xóa chi tiêu (qua Stored Procedure) |
+| **Reports** | Pie / Bar / Line chart, Demo UDF, View |
 
 ---
 
-## 🔧 Các SQL object được sử dụng
+## Các SQL object được sử dụng
 
 | Loại | Tên | Sử dụng tại |
 |---|---|---|
@@ -66,7 +66,7 @@ App sẽ tự động mở trên trình duyệt tại `http://localhost:8501`.
 
 ---
 
-## 📁 Cấu trúc file
+## Cấu trúc file
 
 ```
 finance_app/
@@ -78,7 +78,7 @@ finance_app/
 
 ---
 
-## ⚠️ Lưu ý
+## Lưu ý
 
 - Khi **sửa/xóa** Income hoặc Expense, app tự động điều chỉnh số dư trong code Python (vì trigger chỉ chạy khi INSERT).
 - Stored Procedure `AddExpense` sẽ **báo lỗi** nếu số dư không đủ — đây là tính năng kiểm tra thông minh.
