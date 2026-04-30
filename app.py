@@ -76,7 +76,7 @@ menu = st.sidebar.radio(
 )
 
 st.sidebar.divider()
-st.sidebar.caption("**NEU - Dương Hà Linh**")
+st.sidebar.caption("**NEU - Duong Ha linh**")
 st.sidebar.caption("DS66A - 11247184")
 
 
@@ -108,11 +108,7 @@ if menu == "Dashboard":
                 col1.metric("Total income", f"{fmt_money(income)} VND")
                 col2.metric("Total expense", f"{fmt_money(expense)} VND")
                 rate = (savings / income * 100) if income > 0 else 0
-                col3.metric(
-                    "Net savings",
-                    f"{fmt_money(savings)} VND",
-                    delta=f"{rate:.1f}% vs income"
-                )
+                
     #st.caption(f" Dữ liệu lấy qua **Stored Procedure** `GetMonthlyReport({user_id}, {month}, {year})`")
         except Exception as e:
             st.error(f"Error: {e}")
@@ -570,130 +566,192 @@ elif menu == "Reports":
     if user_id:
         report_type = st.selectbox(
             "Report type",
-            ["Spending by category",
-             "Income vs Expense by month",
-             "Spending trend by day",
-             "Demo UDF",
-             "Data summary"]
+            ["Visualization", "Aggregation", "Data summary"]
         )
         st.markdown("---")
 
-        # ----- 1. Pie chart: Chi tiêu theo danh mục -----
-        if report_type == "Spending by category":
-            st.subheader("Percentage of spending by category")
-            data = db.fetch_all("""
-                SELECT c.CategoryName, SUM(e.Amount) AS TotalSpent,
-                       COUNT(*) AS NumTrans
-                FROM Expenses e
-                JOIN ExpenseCategories c ON e.CategoryID=c.CategoryID
-                WHERE e.UserID=%s
-                GROUP BY c.CategoryName
-                ORDER BY TotalSpent DESC
-            """, (user_id,))
-            if data:
-                df = pd.DataFrame(data)
-                df['TotalSpent'] = df['TotalSpent'].astype(float)
+        # ============================================================
+        # VISUALIZATION
+        # ============================================================
+        if report_type == "Visualization":
+            chart_type = st.selectbox(
+                "Select chart",
+                ["Spending by category",
+                 "Income vs Expense by month",
+                 "Daily spending trend",
+                 "Monthly income trend"]
+            )
+            st.markdown("---")
 
-                col1, col2 = st.columns([2, 1])
-                with col1:
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    colors = plt.cm.Set3(range(len(df)))
-                    ax.pie(df['TotalSpent'], labels=df['CategoryName'],
-                           autopct='%1.1f%%', startangle=90, colors=colors)
-                    ax.set_title('Spending by Category', fontsize=14)
+            # ----- Pie chart: Chi tiêu theo danh mục -----
+            if chart_type == "Spending by category":
+                st.subheader("Percentage of spending by category")
+                data = db.fetch_all("""
+                    SELECT c.CategoryName, SUM(e.Amount) AS TotalSpent,
+                           COUNT(*) AS NumTrans
+                    FROM Expenses e
+                    JOIN ExpenseCategories c ON e.CategoryID=c.CategoryID
+                    WHERE e.UserID=%s
+                    GROUP BY c.CategoryName
+                    ORDER BY TotalSpent DESC
+                """, (user_id,))
+                if data:
+                    df = pd.DataFrame(data)
+                    df['TotalSpent'] = df['TotalSpent'].astype(float)
+                    col1, col2 = st.columns([2, 1])
+                    with col1:
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        colors = plt.cm.Set3(range(len(df)))
+                        ax.pie(df['TotalSpent'], labels=df['CategoryName'],
+                               autopct='%1.1f%%', startangle=90, colors=colors)
+                        ax.set_title('Spending by Category', fontsize=14)
+                        st.pyplot(fig)
+                    with col2:
+                        st.markdown("### Detailed breakdown")
+                        df_d = df.copy()
+                        df_d['TotalSpent'] = df_d['TotalSpent'].apply(fmt_money)
+                        st.dataframe(df_d, hide_index=True)
+                else:
+                    st.info("No spending data available.")
+
+            # ----- Bar chart: Thu vs Chi theo tháng -----
+            elif chart_type == "Income vs Expense by month":
+                st.subheader("Comparison of income and expenses by month")
+                today = date.today()
+                col1, col2, col3, col4 = st.columns(4)
+                month_from = col1.selectbox("From month", list(range(1, 13)),
+                                            index=0, key="bar_m_from")
+                year_from = col2.number_input("From year", value=today.year,
+                                              step=1, key="bar_yr_from")
+                month_to = col3.selectbox("To month", list(range(1, 13)),
+                                          index=today.month - 1, key="bar_m_to")
+                year_to = col4.number_input("To year", value=today.year,
+                                            step=1, key="bar_yr_to")
+                data = db.fetch_all("""
+                    SELECT * FROM MonthlyFinancialSummary
+                    WHERE UserID=%s
+                      AND (Year * 100 + Month) BETWEEN %s AND %s
+                    ORDER BY Year, Month
+                """, (user_id,
+                      int(year_from) * 100 + int(month_from),
+                      int(year_to) * 100 + int(month_to)))
+                if data:
+                    df = pd.DataFrame(data)
+                    df['Period'] = df['Year'].astype(str) + '-' + df['Month'].astype(str).str.zfill(2)
+                    df['TotalIncome'] = df['TotalIncome'].astype(float)
+                    df['TotalExpense'] = df['TotalExpense'].astype(float)
+                    df['NetSavings'] = df['NetSavings'].astype(float)
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    x = range(len(df))
+                    w = 0.35
+                    ax.bar([i - w/2 for i in x], df['TotalIncome'] / 1000, w,
+                           label='Income', color='#2ecc71')
+                    ax.bar([i + w/2 for i in x], df['TotalExpense'] / 1000, w,
+                           label='Expense', color='#e74c3c')
+                    ax.set_xlabel('Month')
+                    ax.set_ylabel('Thousands VND')
+                    ax.set_title('Income vs Expense by Month')
+                    ax.set_xticks(list(x))
+                    ax.set_xticklabels(df['Period'], rotation=45, ha='right')
+                    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
                     st.pyplot(fig)
-                with col2:
-                    st.markdown("### Detailed breakdown")
-                    df_d = df.copy()
-                    df_d['TotalSpent'] = df_d['TotalSpent'].apply(fmt_money)
-                    st.dataframe(df_d, hide_index=True)
-            else:
-                st.info("No spending data available.")
+                    df_d = df[['Period', 'TotalIncome', 'TotalExpense', 'NetSavings']].copy()
+                    for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
+                        df_d[col] = df_d[col].apply(fmt_money)
+                    st.dataframe(df_d, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No data available.")
 
-        # ----- 2. Bar chart: Thu vs Chi theo tháng -----
-        elif report_type == "Income vs Expense by month":
-            st.subheader("Comparison of income and expenses by month")
-            today = date.today()
-            col_yr1, col_yr2 = st.columns(2)
-            year_from = col_yr1.number_input("From year", value=today.year - 1, step=1, key="bar_yr_from")
-            year_to = col_yr2.number_input("To year", value=today.year, step=1, key="bar_yr_to")
-            data = db.fetch_all("""
-                SELECT * FROM MonthlyFinancialSummary
-                WHERE UserID=%s AND Year BETWEEN %s AND %s
-                ORDER BY Year, Month
-            """, (user_id, int(year_from), int(year_to)))
-            if data:
-                df = pd.DataFrame(data)
-                df['Period'] = df['Year'].astype(str) + '-' + df['Month'].astype(str).str.zfill(2)
-                df['TotalIncome'] = df['TotalIncome'].astype(float)
-                df['TotalExpense'] = df['TotalExpense'].astype(float)
-                df['NetSavings'] = df['NetSavings'].astype(float)
+            # ----- Line chart: Chi tiêu theo ngày -----
+            elif chart_type == "Daily spending trend":
+                import calendar
+                st.subheader("Daily spending trend")
+                today = date.today()
+                col_m, col_y = st.columns(2)
+                sel_month = col_m.selectbox("Month", list(range(1, 13)),
+                                            index=today.month - 1, key="trend_month")
+                sel_year = col_y.number_input("Year", value=today.year, step=1, key="trend_year")
+                data = db.fetch_all("""
+                    SELECT ExpenseDate AS d, SUM(Amount) AS total
+                    FROM Expenses
+                    WHERE UserID=%s
+                      AND MONTH(ExpenseDate)=%s
+                      AND YEAR(ExpenseDate)=%s
+                    GROUP BY ExpenseDate
+                    ORDER BY ExpenseDate
+                """, (user_id, int(sel_month), int(sel_year)))
+                if data:
+                    df = pd.DataFrame(data)
+                    df['total'] = df['total'].astype(float)
+                    df['d'] = pd.to_datetime(df['d'])
+                    m, y = int(sel_month), int(sel_year)
+                    x_start = pd.Timestamp(year=y, month=m, day=1)
+                    x_end = pd.Timestamp(year=y, month=m, day=calendar.monthrange(y, m)[1])
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    ax.plot(df['d'], df['total'] / 1000, marker='o', linewidth=2, color='#3498db')
+                    ax.fill_between(df['d'], df['total'] / 1000, alpha=0.3, color='#3498db')
+                    ax.set_xlim(x_start, x_end)
+                    ax.set_xlabel('Day')
+                    ax.set_ylabel('Thousands VND')
+                    ax.set_title(f'Daily Spending Trend — {m:02d}/{y}')
+                    ax.grid(True, alpha=0.3)
+                    ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+                    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
+                    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+                    fig.autofmt_xdate()
+                    st.pyplot(fig)
+                else:
+                    st.info("No data available.")
 
-                fig, ax = plt.subplots(figsize=(10, 5))
-                x = range(len(df))
-                w = 0.35
-                # Chia /1000 để hiển thị theo đơn vị nghìn VND
-                ax.bar([i - w/2 for i in x], df['TotalIncome'] / 1000, w,
-                       label='Income', color='#2ecc71')
-                ax.bar([i + w/2 for i in x], df['TotalExpense'] / 1000, w,
-                       label='Expense', color='#e74c3c')
-                ax.set_xlabel('Month')
-                ax.set_ylabel('Thousands VND')
-                ax.set_title('Income vs Expense by month')
-                ax.set_xticks(list(x))
-                ax.set_xticklabels(df['Period'])
-                # Format trục y với dấu phẩy ngăn cách hàng nghìn
-                ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
-                ax.legend()
-                ax.grid(True, alpha=0.3)
-                st.pyplot(fig)
+            # ----- Line chart: Xu hướng thu nhập theo tháng (MỚI) -----
+            elif chart_type == "Monthly income trend":
+                st.subheader("Monthly income trend")
+                today = date.today()
+                col1, col2, col3, col4 = st.columns(4)
+                month_from = col1.selectbox("From month", list(range(1, 13)),
+                                            index=0, key="inc_trend_m_from")
+                year_from = col2.number_input("From year", value=today.year,
+                                              step=1, key="inc_trend_yr_from")
+                month_to = col3.selectbox("To month", list(range(1, 13)),
+                                          index=today.month - 1, key="inc_trend_m_to")
+                year_to = col4.number_input("To year", value=today.year,
+                                            step=1, key="inc_trend_yr_to")
+                data = db.fetch_all("""
+                    SELECT * FROM MonthlyFinancialSummary
+                    WHERE UserID=%s
+                      AND (Year * 100 + Month) BETWEEN %s AND %s
+                    ORDER BY Year, Month
+                """, (user_id,
+                      int(year_from) * 100 + int(month_from),
+                      int(year_to) * 100 + int(month_to)))
+                if data:
+                    df = pd.DataFrame(data)
+                    df['Period'] = df['Year'].astype(str) + '-' + df['Month'].astype(str).str.zfill(2)
+                    df['TotalIncome'] = df['TotalIncome'].astype(float)
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    ax.plot(df['Period'], df['TotalIncome'] / 1000,
+                            marker='o', linewidth=2, color='#2ecc71')
+                    ax.fill_between(df['Period'], df['TotalIncome'] / 1000,
+                                    alpha=0.25, color='#2ecc71')
+                    ax.set_xlabel('Month')
+                    ax.set_ylabel('Thousands VND')
+                    ax.set_title('Monthly Income Trend')
+                    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
+                    ax.grid(True, alpha=0.3)
+                    plt.xticks(rotation=45, ha='right')
+                    st.pyplot(fig)
+                    df_d = df[['Period', 'TotalIncome']].copy()
+                    df_d['TotalIncome'] = df_d['TotalIncome'].apply(fmt_money)
+                    df_d.columns = ['Period', 'Income (VND)']
+                    st.dataframe(df_d, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No income data available.")
 
-                df_d = df[['Period', 'TotalIncome', 'TotalExpense', 'NetSavings']].copy()
-                for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
-                    df_d[col] = df_d[col].apply(fmt_money)
-                st.dataframe(df_d, use_container_width=True, hide_index=True)
-            else:
-                st.info("No data available.")
-
-        # ----- 3. Line chart: Xu hướng chi tiêu -----
-        elif report_type == "Spending trend by day":
-            st.subheader("Daily spending trend")
-            today = date.today()
-            col_m, col_y = st.columns(2)
-            sel_month = col_m.selectbox("Month", list(range(1, 13)),
-                                        index=today.month - 1, key="trend_month")
-            sel_year = col_y.number_input("Year", value=today.year, step=1, key="trend_year")
-            data = db.fetch_all("""
-                SELECT ExpenseDate AS d, SUM(Amount) AS total
-                FROM Expenses
-                WHERE UserID=%s
-                  AND MONTH(ExpenseDate)=%s
-                  AND YEAR(ExpenseDate)=%s
-                GROUP BY ExpenseDate
-                ORDER BY ExpenseDate
-            """, (user_id, int(sel_month), int(sel_year)))
-            if data:
-                df = pd.DataFrame(data)
-                df['total'] = df['total'].astype(float)
-                df['d'] = pd.to_datetime(df['d'])
-
-                fig, ax = plt.subplots(figsize=(10, 5))
-                ax.plot(df['d'], df['total'] / 1000, marker='o', linewidth=2, color='#3498db')
-                ax.fill_between(df['d'], df['total'] / 1000, alpha=0.3, color='#3498db')
-                ax.set_xlabel('Day')
-                ax.set_ylabel('Thousands VND')
-                ax.set_title('Daily Spending Trend')
-                ax.grid(True, alpha=0.3)
-                # Format ngày DD/MM/YYYY
-                ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m/%Y'))
-                # Format trục y với dấu phẩy
-                ax.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:,.0f}'))
-                fig.autofmt_xdate()
-                st.pyplot(fig)
-            else:
-                st.info("No data available.")
-
-        # ----- 4. Demo UDF -----
+        # ============================================================
+        # AGGREGATION (Demo UDF)
+        # ============================================================
         elif report_type == "Aggregation":
             st.subheader("Quick lookup of income/expense for any month")
 
@@ -706,11 +764,23 @@ elif menu == "Reports":
             if st.button("Calculate"):
                 inc = db.call_function('GetTotalMonthlyIncome', (user_id, month, year))
                 exp = db.call_function('GetTotalMonthlyExpense', (user_id, month, year))
+                savings = float(inc or 0) - float(exp or 0)
+                exp_ratio = (float(exp or 0) / float(inc) * 100) if float(inc or 0) > 0 else 0.0
+                if exp_ratio <= 70:
+                    budget_status = "Excellent"
+                elif exp_ratio <= 90:
+                    budget_status = "Good"
+                elif exp_ratio <= 100:
+                    budget_status = "Warning"
+                else:
+                    budget_status = "Over budget"
 
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Income", f"{fmt_money(inc)} VND")
                 col2.metric("Expense", f"{fmt_money(exp)} VND")
-                col3.metric("Savings", f"{fmt_money(float(inc or 0) - float(exp or 0))} VND")
+                col3.metric("Budget Status", budget_status,
+                            delta=f"Expense {exp_ratio:.1f}% of income")
+                col4.metric("Net Savings", f"{fmt_money(savings)} VND")
 
             #   st.markdown("**Câu SQL đã chạy ngầm:**")
             #st.code(f"SELECT GetTotalMonthlyIncome({user_id}, {month}, {year});\n" f"-- Kết quả: {inc}\n\n" f"SELECT GetTotalMonthlyExpense({user_id}, {month}, {year});\n" f"-- Kết quả: {exp}",
@@ -724,35 +794,14 @@ elif menu == "Reports":
 
             view_choice = st.selectbox(
                 "Select view option to display",
-                ["Total transactions by category",
-                 "Transaction history",
+                ["Transaction history",
                  "Monthly financial summary"]
             )
             st.markdown("---")
 
-            # ---- VIEW 1 ----
-            if view_choice == "Total transactions by category":
-                st.markdown("#### `Total transactions by category`")
-                st.caption("Total spending and number of transactions by different category.")
-                v1 = db.fetch_all("""
-                    SELECT c.CategoryName, SUM(e.Amount) AS TotalSpent,
-                           COUNT(*) AS NumTransactions
-                    FROM Expenses e
-                    JOIN ExpenseCategories c ON e.CategoryID = c.CategoryID
-                    WHERE e.UserID = %s
-                    GROUP BY c.CategoryName
-                    ORDER BY TotalSpent DESC
-                """, (user_id,))
-                if v1:
-                    df = pd.DataFrame(v1)
-                    df['Total Spent'] = df['Total Spent'].apply(fmt_money)
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No data available.")
-
             # ---- VIEW 2 ----
-            elif view_choice == "Transaction history":
-                st.markdown("#### `Transaction history`")
+            if view_choice == "Transaction history":
+                st.markdown("Transaction history")
             # st.caption("Toàn bộ lịch sử giao dịch (income + expense) gộp lại, sắp xếp theo ngày.")
 
                 view_mode = st.radio(
@@ -787,7 +836,7 @@ elif menu == "Reports":
 
             # ---- VIEW 3 ----
             elif view_choice == "Monthly financial summary":
-                st.markdown("#### `Monthly financial summary`")
+                st.markdown("Monthly financial summarys")
                 #st.caption("Tổng hợp thu - chi - tiết kiệm theo từng tháng của user đã chọn. "
                 #VIEW bắt buộc theo đề bài (monthly income/expense summaries).")
  
