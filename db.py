@@ -1,16 +1,15 @@
 import mysql.connector
 from mysql.connector import Error
 
-# CẤU HÌNH KẾT NỐI 
+#CẤU HÌNH KẾT NỐI 
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
     'password': 'Mysql@1234',   
     'database': 'PersonalFinanceDB',
-    'charset': 'utf8mb4'
-}
+    'charset': 'utf8mb4'}
 
-#tạo kết nối với database
+#tạo kết nối với mysql
 def get_connection():
     return mysql.connector.connect(**DB_CONFIG)
 

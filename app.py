@@ -837,7 +837,7 @@ elif menu == "Reports":
 
             # ---- VIEW 3 ----
             elif view_choice == "Monthly financial summary":
-                st.markdown("Monthly financial summarys")
+                st.markdown("Monthly financial summary")
                 #st.caption("Tổng hợp thu - chi - tiết kiệm theo từng tháng của user đã chọn. "
                 #VIEW bắt buộc theo đề bài (monthly income/expense summaries).")
  
