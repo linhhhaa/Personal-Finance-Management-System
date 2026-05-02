@@ -107,8 +107,8 @@ if menu == "Dashboard":
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Total income", f"{fmt_money(income)} VND")
                 col2.metric("Total expense", f"{fmt_money(expense)} VND")
-                rate = (savings / income * 100) if income > 0 else 0
-                
+                col3.metric("Net savings", f"{fmt_money(savings)} VND")
+
     #st.caption(f" Dữ liệu lấy qua **Stored Procedure** `GetMonthlyReport({user_id}, {month}, {year})`")
         except Exception as e:
             st.error(f"Error: {e}")
@@ -127,6 +127,7 @@ if menu == "Dashboard":
 
         # Recent transactions
         st.subheader("10 most recent transactions")
+        
         history = db.fetch_all("""
             SELECT 'Income' AS Type, i.IncomeDate AS Date,
                    b.BankName AS Account, i.Amount, i.Description
@@ -846,8 +847,13 @@ elif menu == "Reports":
                 )
                 if v3:
                     df = pd.DataFrame(v3)
-                    for col in ['Total Income', 'Total Expense', 'Net Savings']:
+                    for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
                         df[col] = df[col].apply(fmt_money)
+                    df = df.rename(columns={
+                        'TotalIncome': 'Total Income',
+                        'TotalExpense': 'Total Expense',
+                        'NetSavings': 'Net Savings'
+                    })
                     st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
                     st.info("This user has no financial data to summarize.")
