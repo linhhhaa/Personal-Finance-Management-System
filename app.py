@@ -340,6 +340,10 @@ elif menu == "Income":
             user_dict = {u['UserName']: u['UserID'] for u in users}
 
             if action == "Add":
+                # Hiển thị flash message từ lần submit trước (nếu có)
+                if st.session_state.get('inc_add_success'):
+                    st.success(st.session_state.pop('inc_add_success'))
+
                 user = st.selectbox("User", list(user_dict.keys()), key="inc_u")
                 accs = get_accounts(user_dict[user])
                 if not accs:
@@ -351,7 +355,6 @@ elif menu == "Income":
                         amt = st.number_input("Amount (VND) *", min_value=0.0, step=10000.0)
                         d = st.date_input("Date", value=date.today())
                         desc = st.text_input("Description")
-                       # st.caption(" **Trigger** `After_Income_Insert` will automatically add money to the balance.")
                         if st.form_submit_button("Add Income"):
                             if amt > 0:
                                 db.execute(
@@ -359,7 +362,10 @@ elif menu == "Income":
                                     "VALUES(%s, %s, %s, %s, %s)",
                                     (user_dict[user], acc_dict[acc], amt, d, desc)
                                 )
-                                st.toast("Income added! Balance has been updated.")
+                                st.session_state['inc_add_success'] = (
+                                    f"Income of {fmt_money(amt)} VND added successfully. "
+                                    f"Account balance has been updated by the trigger."
+                                )
                                 st.rerun()
 
             elif action == "Update":
@@ -461,6 +467,10 @@ elif menu == "Expenses":
             user_dict = {u['UserName']: u['UserID'] for u in users}
 
             if action == "Add New":
+                # Hiển thị flash message từ lần submit trước (nếu có)
+                if st.session_state.get('exp_add_success'):
+                    st.success(st.session_state.pop('exp_add_success'))
+
                 user = st.selectbox("Name", list(user_dict.keys()), key="exp_u")
                 accs = get_accounts(user_dict[user])
                 if not accs:
@@ -479,7 +489,6 @@ elif menu == "Expenses":
                         amt = st.number_input("Amount (VND) *", min_value=0.0, step=10000.0)
                         d = st.date_input("Date", value=date.today())
                         desc = st.text_input("Description")
-                      #  st.caption("Gọi **Stored Procedure** `AddExpense` (kiểm tra số dư + insert + trigger).")
                         if st.form_submit_button("Add Expense"):
                             if amt > 0:
                                 try:
@@ -487,7 +496,10 @@ elif menu == "Expenses":
                                         user_dict[user], acc_dict[acc], cat_dict[cat],
                                         amt, d, desc
                                     ))
-                                    st.toast("Expense added! Balance updated.")
+                                    st.session_state['exp_add_success'] = (
+                                        f"Expense of {fmt_money(amt)} VND added successfully. "
+                                        f"Account balance has been updated by the trigger."
+                                    )
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error: {e}")
@@ -587,33 +599,66 @@ elif menu == "Reports":
             # ----- Pie chart: Chi tiêu theo danh mục -----
             if chart_type == "Spending by category":
                 st.subheader("Percentage of spending by category")
-                data = db.fetch_all("""
+
+                today = date.today()
+                period = st.radio(
+                    "Period",
+                    ["All time", "Specific month", "Specific year"],
+                    horizontal=True,
+                    key="pie_period"
+                )
+
+                where_clause = "WHERE e.UserID=%s"
+                params = [user_id]
+                period_label = "All time"
+
+                if period == "Specific month":
+                    col_m, col_y = st.columns(2)
+                    sel_month = col_m.selectbox("Month", list(range(1, 13)),
+                                                index=today.month - 1, key="pie_m")
+                    sel_year = col_y.number_input("Year", value=today.year,
+                                                  step=1, key="pie_y")
+                    where_clause += " AND MONTH(e.ExpenseDate)=%s AND YEAR(e.ExpenseDate)=%s"
+                    params.extend([int(sel_month), int(sel_year)])
+                    period_label = f"{int(sel_month):02d}/{int(sel_year)}"
+                elif period == "Specific year":
+                    sel_year = st.number_input("Year", value=today.year,
+                                               step=1, key="pie_y_only")
+                    where_clause += " AND YEAR(e.ExpenseDate)=%s"
+                    params.append(int(sel_year))
+                    period_label = f"Year {int(sel_year)}"
+
+                data = db.fetch_all(f"""
                     SELECT c.CategoryName, SUM(e.Amount) AS TotalSpent,
                            COUNT(*) AS NumTrans
                     FROM Expenses e
                     JOIN ExpenseCategories c ON e.CategoryID=c.CategoryID
-                    WHERE e.UserID=%s
+                    {where_clause}
                     GROUP BY c.CategoryName
                     ORDER BY TotalSpent DESC
-                """, (user_id,))
+                """, tuple(params))
+
                 if data:
                     df = pd.DataFrame(data)
                     df['TotalSpent'] = df['TotalSpent'].astype(float)
+                    total_spent = df['TotalSpent'].sum()
                     col1, col2 = st.columns([2, 1])
                     with col1:
                         fig, ax = plt.subplots(figsize=(8, 6))
                         colors = plt.cm.Set3(range(len(df)))
                         ax.pie(df['TotalSpent'], labels=df['CategoryName'],
                                autopct='%1.1f%%', startangle=90, colors=colors)
-                        ax.set_title('Spending by Category', fontsize=14)
+                        ax.set_title(f'Spending by Category — {period_label}',
+                                     fontsize=14)
                         st.pyplot(fig)
                     with col2:
                         st.markdown("### Detailed breakdown")
                         df_d = df.copy()
                         df_d['TotalSpent'] = df_d['TotalSpent'].apply(fmt_money)
                         st.dataframe(df_d, hide_index=True)
+                        st.info(f"Total: **{fmt_money(total_spent)} VND**")
                 else:
-                    st.info("No spending data available.")
+                    st.info(f"No spending data available for {period_label}.")
 
             # ----- Bar chart: Thu vs Chi theo tháng -----
             elif chart_type == "Income vs Expense by month":
@@ -751,37 +796,79 @@ elif menu == "Reports":
                     st.info("No income data available.")
 
         # ============================================================
-        # AGGREGATION (Demo UDF)
+        # AGGREGATION (Demo UDF + Yearly view)
         # ============================================================
         elif report_type == "Aggregation":
-            st.subheader("Quick lookup of income/expense for any month")
+            period_type = st.radio(
+                "Period type",
+                ["Monthly", "Yearly"],
+                horizontal=True,
+                key="agg_period"
+            )
 
             today = date.today()
-            col1, col2 = st.columns(2)
-            month = col1.selectbox("Month", list(range(1, 13)),
-                                   index=today.month - 1, key="udf_m")
-            year = col2.number_input("Year", value=today.year, step=1, key="udf_y")
 
-            if st.button("Calculate"):
-                inc = db.call_function('GetTotalMonthlyIncome', (user_id, month, year))
-                exp = db.call_function('GetTotalMonthlyExpense', (user_id, month, year))
-                savings = float(inc or 0) - float(exp or 0)
-                exp_ratio = (float(exp or 0) / float(inc) * 100) if float(inc or 0) > 0 else 0.0
-                if exp_ratio <= 70:
-                    budget_status = "Excellent"
-                elif exp_ratio <= 90:
-                    budget_status = "Good"
-                elif exp_ratio <= 100:
-                    budget_status = "Warning"
-                else:
-                    budget_status = "Over budget"
+            if period_type == "Monthly":
+                st.subheader("Quick lookup of income/expense for any month")
+                col1, col2 = st.columns(2)
+                month = col1.selectbox("Month", list(range(1, 13)),
+                                       index=today.month - 1, key="udf_m")
+                year = col2.number_input("Year", value=today.year, step=1, key="udf_y")
 
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Income", f"{fmt_money(inc)} VND")
-                col2.metric("Expense", f"{fmt_money(exp)} VND")
-                col3.metric("Budget Status", budget_status,
-                            delta=f"Expense {exp_ratio:.1f}% of income")
-                col4.metric("Net Savings", f"{fmt_money(savings)} VND")
+                if st.button("Calculate", key="udf_calc_m"):
+                    inc = db.call_function('GetTotalMonthlyIncome', (user_id, month, year))
+                    exp = db.call_function('GetTotalMonthlyExpense', (user_id, month, year))
+                    savings = float(inc or 0) - float(exp or 0)
+                    exp_ratio = (float(exp or 0) / float(inc) * 100) if float(inc or 0) > 0 else 0.0
+                    if exp_ratio <= 70:
+                        budget_status = "Excellent"
+                    elif exp_ratio <= 90:
+                        budget_status = "Good"
+                    elif exp_ratio <= 100:
+                        budget_status = "Warning"
+                    else:
+                        budget_status = "Over budget"
+
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.metric("Income", f"{fmt_money(inc)} VND")
+                    col2.metric("Expense", f"{fmt_money(exp)} VND")
+                    col3.metric("Budget Status", budget_status,
+                                delta=f"Expense {exp_ratio:.1f}% of income")
+                    col4.metric("Net Savings", f"{fmt_money(savings)} VND")
+
+            else:
+                st.subheader("Annual income/expense summary")
+                year = st.number_input("Year", value=today.year, step=1, key="udf_yr")
+
+                if st.button("Calculate", key="udf_calc_y"):
+                    row = db.fetch_one(
+                        "SELECT TotalIncome, TotalExpense, NetSavings "
+                        "FROM YearlyFinancialSummary "
+                        "WHERE UserID=%s AND Year=%s",
+                        (user_id, int(year))
+                    )
+                    if row:
+                        inc = float(row['TotalIncome'] or 0)
+                        exp = float(row['TotalExpense'] or 0)
+                        savings = float(row['NetSavings'] or 0)
+                        exp_ratio = (exp / inc * 100) if inc > 0 else 0.0
+                        if exp_ratio <= 70:
+                            budget_status = "Excellent"
+                        elif exp_ratio <= 90:
+                            budget_status = "Good"
+                        elif exp_ratio <= 100:
+                            budget_status = "Warning"
+                        else:
+                            budget_status = "Over budget"
+
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.metric(f"Income {int(year)}", f"{fmt_money(inc)} VND")
+                        col2.metric(f"Expense {int(year)}", f"{fmt_money(exp)} VND")
+                        col3.metric("Budget Status", budget_status,
+                                    delta=f"Expense {exp_ratio:.1f}% of income")
+                        col4.metric("Net Savings", f"{fmt_money(savings)} VND")
+                    else:
+                        st.info(f"No financial data for year {int(year)}.")
 
             #   st.markdown("**Câu SQL đã chạy ngầm:**")
             #st.code(f"SELECT GetTotalMonthlyIncome({user_id}, {month}, {year});\n" f"-- Kết quả: {inc}\n\n" f"SELECT GetTotalMonthlyExpense({user_id}, {month}, {year});\n" f"-- Kết quả: {exp}",
@@ -796,7 +883,8 @@ elif menu == "Reports":
             view_choice = st.selectbox(
                 "Select view option to display",
                 ["Transaction history",
-                 "Monthly financial summary"]
+                 "Monthly financial summary",
+                 "Yearly financial summary"]
             )
             st.markdown("---")
 
@@ -838,9 +926,7 @@ elif menu == "Reports":
             # ---- VIEW 3 ----
             elif view_choice == "Monthly financial summary":
                 st.markdown("Monthly financial summary")
-                #st.caption("Tổng hợp thu - chi - tiết kiệm theo từng tháng của user đã chọn. "
-                #VIEW bắt buộc theo đề bài (monthly income/expense summaries).")
- 
+
                 v3 = db.fetch_all(
                     "SELECT * FROM MonthlyFinancialSummary WHERE UserID=%s ORDER BY Year, Month",
                     (user_id,)
@@ -857,4 +943,25 @@ elif menu == "Reports":
                     st.dataframe(df, use_container_width=True, hide_index=True)
                 else:
                     st.info("This user has no financial data to summarize.")
+
+            # ---- VIEW 4 ----
+            elif view_choice == "Yearly financial summary":
+                st.markdown("Yearly financial summary")
+
+                v4 = db.fetch_all(
+                    "SELECT * FROM YearlyFinancialSummary WHERE UserID=%s ORDER BY Year",
+                    (user_id,)
+                )
+                if v4:
+                    df = pd.DataFrame(v4)
+                    for col in ['TotalIncome', 'TotalExpense', 'NetSavings']:
+                        df[col] = df[col].apply(fmt_money)
+                    df = df.rename(columns={
+                        'TotalIncome': 'Total Income',
+                        'TotalExpense': 'Total Expense',
+                        'NetSavings': 'Net Savings'
+                    })
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("This user has no yearly data to summarize.")
  
