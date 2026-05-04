@@ -192,6 +192,25 @@ JOIN (
 GROUP BY u.UserID, u.UserName, Year, Month
 ORDER BY u.UserID, Year, Month;
 
+-- View 4: Tổng hợp thu/chi/tiết kiệm theo năm
+CREATE OR REPLACE VIEW YearlyFinancialSummary AS
+SELECT
+    u.UserID,
+    u.UserName,
+    YEAR(trans.TransDate) AS Year,
+    SUM(CASE WHEN trans.Type = 'Income'  THEN trans.Amount ELSE 0 END) AS TotalIncome,
+    SUM(CASE WHEN trans.Type = 'Expense' THEN trans.Amount ELSE 0 END) AS TotalExpense,
+    SUM(CASE WHEN trans.Type = 'Income'  THEN trans.Amount ELSE 0 END) -
+    SUM(CASE WHEN trans.Type = 'Expense' THEN trans.Amount ELSE 0 END) AS NetSavings
+FROM Users u
+JOIN (
+    SELECT UserID, Amount, IncomeDate  AS TransDate, 'Income'  AS Type FROM Income
+    UNION ALL
+    SELECT UserID, Amount, ExpenseDate AS TransDate, 'Expense' AS Type FROM Expenses
+) AS trans ON u.UserID = trans.UserID
+GROUP BY u.UserID, u.UserName, Year
+ORDER BY u.UserID, Year;
+
 -- 6. USER DEFINED FUNCTIONS (UDF)
 -- UDF 1: Tổng chi tiêu của 1 user trong tháng cụ thể
 DELIMITER //
