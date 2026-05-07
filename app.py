@@ -816,24 +816,35 @@ elif menu == "Reports":
                 year = col2.number_input("Year", value=today.year, step=1, key="udf_y")
 
                 if st.button("Calculate", key="udf_calc_m"):
-                    inc = db.call_function('GetTotalMonthlyIncome', (user_id, month, year))
-                    exp = db.call_function('GetTotalMonthlyExpense', (user_id, month, year))
-                    savings = float(inc or 0) - float(exp or 0)
-                    exp_ratio = (float(exp or 0) / float(inc) * 100) if float(inc or 0) > 0 else 0.0
-                    if exp_ratio <= 70:
-                        budget_status = "Excellent"
-                    elif exp_ratio <= 90:
-                        budget_status = "Good"
-                    elif exp_ratio <= 100:
-                        budget_status = "Warning"
+                    inc = float(db.call_function('GetTotalMonthlyIncome', (user_id, month, year)) or 0)
+                    exp = float(db.call_function('GetTotalMonthlyExpense', (user_id, month, year)) or 0)
+                    savings = inc - exp
+
+                    if inc <= 0:
+                        if exp > 0:
+                            budget_status = "Over budget"
+                            ratio_text = "No income, expense only"
+                        else:
+                            budget_status = "No data"
+                            ratio_text = "No transactions"
                     else:
-                        budget_status = "Over budget"
+                        exp_ratio = exp / inc * 100
+                        if exp_ratio <= 70:
+                            budget_status = "Excellent"
+                        elif exp_ratio <= 90:
+                            budget_status = "Good"
+                        elif exp_ratio <= 100:
+                            budget_status = "Warning"
+                        else:
+                            budget_status = "Over budget"
+                        ratio_text = f"Expense {exp_ratio:.1f}% of income"
 
                     col1, col2, col3, col4 = st.columns(4)
                     col1.metric("Income", f"{fmt_money(inc)} VND")
                     col2.metric("Expense", f"{fmt_money(exp)} VND")
-                    col3.metric("Budget Status", budget_status,
-                                delta=f"Expense {exp_ratio:.1f}% of income")
+                    with col3:
+                        st.metric("Budget Status", budget_status)
+                        st.caption(ratio_text)
                     col4.metric("Net Savings", f"{fmt_money(savings)} VND")
 
             else:
@@ -851,21 +862,32 @@ elif menu == "Reports":
                         inc = float(row['TotalIncome'] or 0)
                         exp = float(row['TotalExpense'] or 0)
                         savings = float(row['NetSavings'] or 0)
-                        exp_ratio = (exp / inc * 100) if inc > 0 else 0.0
-                        if exp_ratio <= 70:
-                            budget_status = "Excellent"
-                        elif exp_ratio <= 90:
-                            budget_status = "Good"
-                        elif exp_ratio <= 100:
-                            budget_status = "Warning"
+
+                        if inc <= 0:
+                            if exp > 0:
+                                budget_status = "Over budget"
+                                ratio_text = "No income, expense only"
+                            else:
+                                budget_status = "No data"
+                                ratio_text = "No transactions"
                         else:
-                            budget_status = "Over budget"
+                            exp_ratio = exp / inc * 100
+                            if exp_ratio <= 70:
+                                budget_status = "Excellent"
+                            elif exp_ratio <= 90:
+                                budget_status = "Good"
+                            elif exp_ratio <= 100:
+                                budget_status = "Warning"
+                            else:
+                                budget_status = "Over budget"
+                            ratio_text = f"Expense {exp_ratio:.1f}% of income"
 
                         col1, col2, col3, col4 = st.columns(4)
                         col1.metric(f"Income {int(year)}", f"{fmt_money(inc)} VND")
                         col2.metric(f"Expense {int(year)}", f"{fmt_money(exp)} VND")
-                        col3.metric("Budget Status", budget_status,
-                                    delta=f"Expense {exp_ratio:.1f}% of income")
+                        with col3:
+                            st.metric("Budget Status", budget_status)
+                            st.caption(ratio_text)
                         col4.metric("Net Savings", f"{fmt_money(savings)} VND")
                     else:
                         st.info(f"No financial data for year {int(year)}.")
